@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "e84-geoai-common"
+authors = [{ name = "Jason Gilman", email = "jason@element84.com" }]
+maintainers = [{ name = "Jason Gilman", email = "jason@element84.com" }]
+description = "Contains common Geospatial AI/ML code for Element 84 projects."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = []
+# TODO switch to dynamic git tag versions
+version = "0.0.1"
+# dynamic = ["version"]
+
+[project.urls]
+Github = "https://github.com/Element84/e84-geoai-common"
+
+[tool.uv]
+dev-dependencies = [
+    "build",
+    "pytest",
+]
