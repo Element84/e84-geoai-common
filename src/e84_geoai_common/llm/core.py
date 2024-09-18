@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import json
-from typing import Generic, Literal, TypeVar
+from typing import Generic, Literal, Type, TypeVar
 
 import boto3
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
@@ -93,7 +93,7 @@ Model = TypeVar("Model", bound=BaseModel)
 class ExtractDataRequest(InvokeLLMRequest, Generic[Model]):
     """TODO"""
 
-    model: Model
+    model: Type[Model]
 
 
 def extract_data_from_text(llm: LLM, request: ExtractDataRequest[Model]) -> Model:

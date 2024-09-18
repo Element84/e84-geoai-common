@@ -76,10 +76,11 @@ mypy-extensions==1.0.0
     # via black
 nest-asyncio==1.6.0
     # via ipykernel
-numpy==2.1.1
+numpy==2.0.2
     # via
     #   folium
     #   shapely
+    #   types-shapely
 packaging==24.1
     # via
     #   black
@@ -153,6 +154,8 @@ types-awscrt==0.21.5
     # via botocore-stubs
 types-s3transfer==0.10.2
     # via boto3-stubs
+types-shapely==2.0.0.20240820
+    # via e84-geoai-common (pyproject.toml)
 typing-extensions==4.12.2
     # via
     #   black

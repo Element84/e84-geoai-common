@@ -2,107 +2,51 @@
 
 import json
 import math
-from typing import Any, Protocol, Sequence, runtime_checkable
+from typing import Any
 import shapely
 import shapely.geometry
+
+from shapely import GeometryCollection
+from shapely.geometry.base import BaseGeometry
 
 from e84_geoai_common.util import timed_function
 
 
-@runtime_checkable
-class Geometry(Protocol):
-    """TODO"""
-
-    @property
-    def convex_hull(self) -> "Geometry": ...
-
-    @property
-    def centroid(self) -> "Point": ...
-
-    @property
-    def bounds(self) -> tuple[float, float, float, float]:
-        """Returns min_lon, min_lat, max_lon, max_lat"""
-        ...
-
-    def simplify(
-        self, tolerance: float, preserve_topology: bool = True
-    ) -> "Geometry": ...
-
-    def __len__(self) -> int: ...
-
-    @property
-    def __geo_interface__(self) -> dict[str, Any]:
-        """Returns geojson"""
-        ...
-
-    @property
-    def is_empty(self) -> bool: ...
-
-    def buffer(self, distance: float) -> "Geometry": ...
-
-    def __and__(self, other: "Geometry") -> "Geometry": ...
-    def intersection(self, other: "Geometry") -> "Geometry": ...
-
-    def __or__(self, other: "Geometry") -> "Geometry": ...
-    def union(self, other: "Geometry") -> "Geometry": ...
-
-    def __sub__(self, other: "Geometry") -> "Geometry": ...
-    def difference(self, other: "Geometry") -> "Geometry": ...
-
-    def __xor__(self, other: "Geometry") -> "Geometry": ...
-    def symmetric_difference(self, other: "Geometry") -> "Geometry": ...
-
-
-class Point(Geometry):
-    """TODO"""
-
-    @property
-    def x(self) -> int: ...
-
-    @property
-    def y(self) -> int: ...
-
-
-def GeometryCollection(geoms: Sequence[Geometry]) -> Geometry:
-    """TODO"""
-    return shapely.GeometryCollection(geoms)  # type: ignore
-
-
-def geometry_from_wkt(wkt: str) -> Geometry:
+def geometry_from_wkt(wkt: str) -> BaseGeometry:
     """TODO"""
     return shapely.from_wkt(wkt)  # type: ignore
 
 
-def geometry_from_geojson_dict(geom: dict[str, Any]) -> Geometry:
+def geometry_from_geojson_dict(geom: dict[str, Any]) -> BaseGeometry:
     """TODO"""
-    return shapely.geometry.shape(geom)  # type: ignore
+    return shapely.geometry.shape(geom)
 
 
-def geometry_from_geojson(geojson: str) -> Geometry:
+def geometry_from_geojson(geojson: str) -> BaseGeometry:
     """TODO"""
     return geometry_from_geojson_dict(json.loads(geojson))
 
 
-def geometry_to_geojson(geom: Geometry) -> str:
+def geometry_to_geojson(geom: BaseGeometry) -> str:
     """TODO"""
     return json.dumps(geom.__geo_interface__)
 
 
-def geometry_point_count(geom: Geometry) -> int:
+def geometry_point_count(geom: BaseGeometry) -> int:
     """Returns the number of points in both exterior and interior (if any) in a Geometry."""
     if isinstance(geom, shapely.geometry.Point):
         return 1
     elif isinstance(geom, shapely.geometry.MultiPoint):
-        return len(geom)
+        return len(geom)  # type: ignore
     elif isinstance(geom, shapely.geometry.Polygon):
-        exterior_count = len(geom.exterior.coords)  # type: ignore
-        interior_count = sum(len(interior.coords) for interior in geom.interiors)  # type: ignore
+        exterior_count = len(geom.exterior.coords)
+        interior_count = sum(len(interior.coords) for interior in geom.interiors)
         return exterior_count + interior_count
     elif isinstance(geom, shapely.geometry.MultiPolygon):
         return sum(
-            len(p.exterior.coords)  # type: ignore
-            + sum(len(interior.coords) for interior in p.interiors)  # type: ignore
-            for p in geom.geoms  # type: ignore
+            len(p.exterior.coords)
+            + sum(len(interior.coords) for interior in p.interiors)
+            for p in geom.geoms
         )
     elif isinstance(geom, shapely.geometry.LineString):
         return len(geom.coords)
@@ -115,7 +59,7 @@ def geometry_point_count(geom: Geometry) -> int:
 
 
 @timed_function
-def simplify_geometry(geom: Geometry, max_points: int = 3_000) -> Geometry:
+def simplify_geometry(geom: BaseGeometry, max_points: int = 3_000) -> BaseGeometry:
     """TODO"""
     num_points = geometry_point_count(geom)
     if num_points < max_points:
@@ -130,12 +74,14 @@ def simplify_geometry(geom: Geometry, max_points: int = 3_000) -> Geometry:
     )
 
 
-def BoundingBox(*, west: float, south: float, east: float, north: float) -> Geometry:
+def BoundingBox(
+    *, west: float, south: float, east: float, north: float
+) -> BaseGeometry:
     """TODO"""
     return shapely.geometry.box(west, south, east, north)  # type: ignore
 
 
-def between(g1: Geometry, g2: Geometry) -> Geometry:
+def between(g1: BaseGeometry, g2: BaseGeometry) -> BaseGeometry:
     """Returns the geometry between the two geometries"""
     coll = GeometryCollection([g1, g2])
     return coll.convex_hull - g1.convex_hull - g2.convex_hull
@@ -146,7 +92,7 @@ def degrees_to_radians(deg: float) -> float:
     return deg * (math.pi / 180.0)
 
 
-def add_buffer(g: Geometry, distance_km: float) -> Geometry:
+def add_buffer(g: BaseGeometry, distance_km: float) -> BaseGeometry:
     """TODO"""
     lat_distance = distance_km / 111.32
 

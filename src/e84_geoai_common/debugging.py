@@ -1,8 +1,9 @@
 """TODO"""
 
 import folium  # type: ignore
+from shapely import GeometryCollection
+from shapely.geometry.base import BaseGeometry
 
-from e84_geoai_common.geometry import Geometry, GeometryCollection
 from e84_geoai_common.util import timed_function
 
 SEARCH_AREA_STYLE = {"fillColor": "transparent", "color": "#FF0000", "weight": 3}
@@ -10,10 +11,10 @@ SEARCH_AREA_STYLE = {"fillColor": "transparent", "color": "#FF0000", "weight": 3
 
 @timed_function
 def display_geometry(
-    geoms: list[Geometry],
+    geoms: list[BaseGeometry],
     *,
-    selected_geometry: Geometry | None = None,
-    search_area: Geometry | None = None,
+    selected_geometry: BaseGeometry | None = None,
+    search_area: BaseGeometry | None = None,
 ) -> folium.Map:
     """TODO"""
 

@@ -15,7 +15,8 @@ dependencies = [
   "boto3>=1.35.20",
   "boto3-stubs[bedrock-runtime]>=1.35.20",
   "pydantic>=2.9.1",
-  "shapely>=2.0.6"
+  "shapely>=2.0.6",
+  "types-shapely>=2.0.0.20240820"
 ]
 # TODO switch to dynamic git tag versions
 version = "0.0.1"
