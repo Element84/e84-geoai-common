@@ -1,3 +1,5 @@
+"""TODO"""
+
 import time
 import os
 import textwrap
@@ -5,6 +7,7 @@ from typing import Any, Callable, TypeVar
 
 
 def get_env_var(name: str, default: str | None = None) -> str:
+    """TODO"""
     value = os.getenv(name) or default
 
     if value is None:
@@ -13,7 +16,13 @@ def get_env_var(name: str, default: str | None = None) -> str:
 
 
 def dedent(text: str) -> str:
+    """TODO"""
     return textwrap.dedent(text).strip()
+
+
+def singleline(text: str) -> str:
+    """TODO"""
+    return dedent(text).replace("\n", " ")
 
 
 T = TypeVar("T", bound=Callable[..., Any])

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import json
-from typing import Literal
+from typing import Generic, Literal, TypeVar
 
 import boto3
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
@@ -22,7 +22,7 @@ class LLMMessage(BaseModel):
 class InvokeLLMRequest(BaseModel):
     """TODO"""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     system: str | None = None
     max_tokens: int = 1000
@@ -85,3 +85,20 @@ class BedrockClaudeLLM(LLM):
             return "{" + body
         else:
             return body
+
+
+Model = TypeVar("Model", bound=BaseModel)
+
+
+class ExtractDataRequest(InvokeLLMRequest, Generic[Model]):
+    """TODO"""
+
+    model: Model
+
+
+def extract_data_from_text(llm: LLM, request: ExtractDataRequest[Model]) -> Model:
+    """TODO"""
+    # TODO ideally we wouldn't have to set this here.
+    request.json_mode = True
+    resp = llm.invoke_model(request)
+    return request.model.model_validate_json(resp)

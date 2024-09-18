@@ -23,3 +23,8 @@ version = "0.0.1"
 
 [project.urls]
 Github = "https://github.com/Element84/e84-geoai-common"
+
+[project.optional-dependencies]
+debugging = [
+    "folium>=0.17.0"
+]
