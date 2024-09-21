@@ -2,11 +2,14 @@
 
 from abc import ABC, abstractmethod
 import json
-from typing import Generic, Literal, Type, TypeVar
+from typing import Generic, Literal, TypeVar
 
 import boto3
+import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from pydantic import BaseModel, ConfigDict
+
+from e84_geoai_common.util import timed_function
 
 
 class LLMMessage(BaseModel):
@@ -75,30 +78,53 @@ class BedrockClaudeLLM(LLM):
             }
         )
 
+    @timed_function
     def invoke_model(self, request: InvokeLLMRequest) -> str:
-        resp = self.client.invoke_model(
-            modelId=self.model_id, body=self._llm_request_to_body(request)
-        )
+        if len(request.messages) == 0:
+            raise Exception("Must specify at least one message")
+        req_body = self._llm_request_to_body(request)
+        try:
+            resp = self.client.invoke_model(modelId=self.model_id, body=req_body)
+        except botocore.exceptions.ClientError as vex:
+            print("Failed with", vex)
+            print("Request body:", req_body)
+            raise vex
         body = str(resp["body"].read(), "UTF-8")
-
+        parsed = json.loads(body)
+        llm_response = parsed["content"][0]["text"]
         if request.json_mode:
-            return "{" + body
+            return "{" + llm_response
         else:
-            return body
+            return llm_response
 
 
 Model = TypeVar("Model", bound=BaseModel)
 
 
-class ExtractDataRequest(InvokeLLMRequest, Generic[Model]):
+class ExtractDataExample(BaseModel, Generic[Model]):
     """TODO"""
 
-    model: Type[Model]
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    name: str
+    user_query: str
+    structure: Model
+
+    def to_str(self) -> str:
+        query_json = f"```json\n{self.structure.model_dump_json(indent=2, exclude_none=True)}\n```"
+        return f'Example: {self.name}\nUser Query: "{self.user_query}"\n\n{query_json}'
 
 
-def extract_data_from_text(llm: LLM, request: ExtractDataRequest[Model]) -> Model:
+def extract_data_from_text(
+    *,
+    llm: LLM,
+    model_type: type[Model],
+    system_prompt: str,
+    user_prompt: str,
+) -> Model:
     """TODO"""
-    # TODO ideally we wouldn't have to set this here.
-    request.json_mode = True
+    request = InvokeLLMRequest(
+        system=system_prompt, json_mode=True, messages=[LLMMessage(content=user_prompt)]
+    )
     resp = llm.invoke_model(request)
-    return request.model.model_validate_json(resp)
+    return model_type.model_validate_json(resp)
