@@ -1,3 +1,4 @@
 pytest
 ipykernel
 black
+pyright

@@ -76,6 +76,8 @@ mypy-extensions==1.0.0
     # via black
 nest-asyncio==1.6.0
     # via ipykernel
+nodeenv==1.9.1
+    # via pyright
 numpy==2.0.2
     # via
     #   folium
@@ -112,6 +114,8 @@ pydantic-core==2.23.3
     # via pydantic
 pygments==2.18.0
     # via ipython
+pyright==1.1.381
+    # via -r dev-requirements.in
 pytest==8.3.3
     # via -r dev-requirements.in
 python-dateutil==2.9.0.post0
