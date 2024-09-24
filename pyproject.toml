@@ -29,3 +29,12 @@ Github = "https://github.com/Element84/e84-geoai-common"
 debugging = [
     "folium>=0.17.0"
 ]
+dev = [
+  "pytest>=8.3.3",
+  "ipykernel>=6.29.5",
+  "black>=24.8.0",
+  "pyright>=1.1.381",
+  "build>=1.2.2",
+  "pre-commit>=3.8.0",
+  "pre-commit-hooks>=4.6.0"
+]

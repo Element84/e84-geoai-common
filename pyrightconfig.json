@@ -1,5 +1,7 @@
 {
   "pythonVersion": "3.10",
+  "venvPath": ".",
+  "venv": ".venv",
   "typeCheckingMode": "strict",
 
   "reportGeneralTypeIssues": true,
@@ -11,9 +13,5 @@
   "reportUnknownArgumentType": "error",
   "reportUnknownMemberType": "error",
   "reportUnknownVariableType": "error",
-  "reportUnnecessaryComparison": "error",
-
-  "ignore": [
-    ".venv"
-  ],
+  "reportUnnecessaryComparison": "error"
 }
