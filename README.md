@@ -4,7 +4,6 @@ Contains Geospatial AI/ML related code
 ## TODOs
 
 * setup snyk
-* Setup dynamic version through git tag - https://packaging.python.org/en/latest/guides/single-sourcing-package-version/#single-sourcing-the-version
 
 ## Developing
 
