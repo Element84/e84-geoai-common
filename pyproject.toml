@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 
@@ -18,9 +18,9 @@ dependencies = [
   "shapely>=2.0.6",
   "types-shapely>=2.0.0.20240820"
 ]
-# TODO switch to dynamic git tag versions
-version = "0.0.1"
-# dynamic = ["version"]
+dynamic = ["version"]
+
+[tool.setuptools_scm]
 
 [project.urls]
 Github = "https://github.com/Element84/e84-geoai-common"
