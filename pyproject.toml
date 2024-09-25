@@ -22,6 +22,12 @@ dynamic = ["version"]
 
 [tool.setuptools_scm]
 
+[tool.pytest.ini_options]
+pythonpath = "src"
+testpaths=[
+  "tests"
+]
+
 [project.urls]
 Github = "https://github.com/Element84/e84-geoai-common"
 

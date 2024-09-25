@@ -63,17 +63,17 @@ def geometry_point_count(geom: BaseGeometry) -> int:
     if isinstance(geom, shapely.geometry.Point):
         return 1
     elif isinstance(geom, shapely.geometry.MultiPoint):
-        return len(geom)  # type: ignore
+        return sum(geometry_point_count(g) for g in geom.geoms)
     elif isinstance(geom, shapely.geometry.Polygon):
-        exterior_count = len(geom.exterior.coords)
-        interior_count = sum(len(interior.coords) for interior in geom.interiors)
+        exterior_count = geometry_point_count(geom.exterior)
+        interior_count = sum(
+            geometry_point_count(interior) for interior in geom.interiors
+        )
         return exterior_count + interior_count
     elif isinstance(geom, shapely.geometry.MultiPolygon):
-        return sum(
-            len(p.exterior.coords)
-            + sum(len(interior.coords) for interior in p.interiors)
-            for p in geom.geoms
-        )
+        return sum(geometry_point_count(g) for g in geom.geoms)
+    elif isinstance(geom, shapely.geometry.LinearRing):
+        return len(geom.coords) - 1
     elif isinstance(geom, shapely.geometry.LineString):
         return len(geom.coords)
     elif isinstance(geom, shapely.geometry.MultiLineString):
