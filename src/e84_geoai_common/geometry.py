@@ -16,7 +16,7 @@ def geometry_from_wkt(wkt: str) -> BaseGeometry:
     """
     Convert a Well-Known Text (WKT) string representation of a geometry into a shapely BaseGeometry object.
     """
-    return shapely.geometry.from_wkt(wkt)  # type: ignore
+    return shapely.from_wkt(wkt)  # type: ignore
 
 
 def geometry_from_geojson_dict(geom: dict[str, Any]) -> BaseGeometry:
