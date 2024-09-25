@@ -1,10 +1,6 @@
 # geoai-common
 Contains Geospatial AI/ML related code
 
-## TODOs
-
-* setup snyk
-
 ## Developing
 
 1. Install python and [uv](https://github.com/astral-sh/uv)
