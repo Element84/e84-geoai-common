@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from e84_geoai_common.llm.core import LLM, InvokeLLMRequest, LLMMessage
 
@@ -59,4 +59,8 @@ def extract_data_from_text(
         system=system_prompt, json_mode=True, messages=[LLMMessage(content=user_prompt)]
     )
     resp = llm.invoke_model_with_request(request)
-    return model_type.model_validate_json(resp)
+    try:
+        return model_type.model_validate_json(resp)
+    except ValidationError as e:
+        print("Unable to parse response:", resp)
+        raise e
