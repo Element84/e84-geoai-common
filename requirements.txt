@@ -48,6 +48,8 @@ filelock==3.16.1
     # via virtualenv
 folium==0.17.0
     # via e84-geoai-common (pyproject.toml)
+humanize==4.11.0
+    # via e84-geoai-common (pyproject.toml)
 identify==2.6.1
     # via pre-commit
 idna==3.10

@@ -1,7 +1,11 @@
-import time
+from dataclasses import dataclass, field
+from time import time
+
 import os
 import textwrap
 from typing import Any, Callable, TypeVar
+
+import humanize
 
 
 def get_env_var(name: str, default: str | None = None) -> str:
@@ -88,10 +92,56 @@ def timed_function(func: T) -> T:
     """
 
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        start_time = time.time()  # capture the start time before executing
+        start_time = time()  # capture the start time before executing
         result = func(*args, **kwargs)  # execute the function
-        end_time = time.time()
+        end_time = time()
         print(f"{func.__name__} took {end_time - start_time} seconds to run.")
         return result
 
     return wrapper  # type: ignore
+
+
+@dataclass
+class ProcessTracker:
+    total: int
+    start_time: float = field(default_factory=lambda: time())
+    completed: int = 0
+
+    def increment_completed(self, num_completed: int = 1) -> None:
+        self.completed = self.completed + num_completed
+
+    @property
+    def elapsed_secs(self) -> float:
+        return time() - self.start_time
+
+    @property
+    def elapsed_ms(self) -> int:
+        return int(self.elapsed_secs * 1000)
+
+    @property
+    def completed_per_sec(self) -> float:
+        return self.completed / self.elapsed_secs
+
+    @property
+    def num_left(self) -> int:
+        return self.total - self.completed
+
+    @property
+    def secs_left(self) -> int:
+        return int(self.num_left / self.completed_per_sec)
+
+    @property
+    def completed_pct(self) -> float:
+        return self.completed / self.total
+
+    def report(self) -> None:
+        pct = int(self.completed_pct * 100)
+        if self.completed == 0:
+            rate = "Unknown"
+            time_left = "Unknown"
+        else:
+            rate = round(self.completed_per_sec, 1)
+            time_left = humanize.naturaldelta(self.secs_left)
+        print(
+            f"Completed: {pct}% ({self.completed} out of {self.total}) Rate: {rate} per sec Time Left: {time_left} "
+        )
