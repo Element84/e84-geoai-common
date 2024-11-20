@@ -22,24 +22,22 @@ class BedrockClaudeLLM(LLM):
         self.client = client or boto3.client("bedrock-runtime")  # type: ignore
 
     def _llm_request_to_body(self, request: InvokeLLMRequest) -> str:
-        messages = [
-            {"role": msg.role, "content": msg.content} for msg in request.messages
-        ]
+        messages = [msg.model_dump() for msg in request.messages]
         if request.json_mode:
             # Force Claude into JSON mode
             messages.append({"role": "assistant", "content": "{"})
 
-        return json.dumps(
-            {
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": request.max_tokens,
-                "system": request.system,
-                "messages": messages,
-                "temperature": request.temperature,
-                "top_p": request.top_p,
-                "top_k": request.top_k,
-            }
-        )
+        anthropic_request = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": request.max_tokens,
+            "messages": messages,
+            "temperature": request.temperature,
+            "top_p": request.top_p,
+            "top_k": request.top_k,
+        }
+        if request.system is not None:
+            anthropic_request["system"] = request.system
+        return json.dumps(anthropic_request)
 
     @timed_function
     def invoke_model_with_request(self, request: InvokeLLMRequest) -> str:

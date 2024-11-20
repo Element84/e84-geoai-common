@@ -1,7 +1,49 @@
 from abc import ABC, abstractmethod
+import base64
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class LLMMessageContentText(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    type: Literal["text"] = "text"
+    text: str
+
+
+class LLMMessageContentImageSource(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    type: str = "base64"
+    media_type: str = "image/jpeg"
+    data: str
+
+    @staticmethod
+    def from_bytes(
+        bytez: bytes, format: str = "image/jpeg"
+    ) -> "LLMMessageContentImageSource":
+        data = base64.b64encode(bytez).decode("utf-8")
+        return LLMMessageContentImageSource(media_type=format, data=data)
+
+
+class LLMMessageContentImage(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    type: Literal["image"] = "image"
+    source: LLMMessageContentImageSource
+
+    @staticmethod
+    def from_bytes(
+        bytez: bytes,
+        format: str = "image/jpeg",
+    ) -> "LLMMessageContentImage":
+        return LLMMessageContentImage(
+            source=LLMMessageContentImageSource.from_bytes(bytez, format)
+        )
+
+
+LLMMessageContent = LLMMessageContentText | LLMMessageContentImage
 
 
 class LLMMessage(BaseModel):
@@ -15,8 +57,7 @@ class LLMMessage(BaseModel):
 
     role: Literal["user", "assistant"] = "user"
 
-    # FUTURE: This could be changed to allow for multiple items following the anthropic content style
-    content: str
+    content: str | list[LLMMessageContent]
 
 
 class InvokeLLMRequest(BaseModel):
