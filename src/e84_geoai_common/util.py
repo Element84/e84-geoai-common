@@ -151,7 +151,9 @@ def count_by(items: Sequence[T], fn: Callable[[T], K] = identity) -> dict[K, int
             groups[key] += 1
         else:
             groups[key] = 1
-    return groups
+
+    # Sort the dictionary by values (counts) in descending order
+    return dict(sorted(groups.items(), key=lambda x: x[1], reverse=True))
 
 
 @dataclass
