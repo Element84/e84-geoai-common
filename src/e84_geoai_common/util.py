@@ -7,8 +7,8 @@ from typing import Any, Callable, Sequence, TypeVar
 
 import humanize
 
-T = TypeVar("T", bound=Callable[..., Any])
-K = TypeVar("K", bound=Callable[..., Any])
+T = TypeVar("T")
+K = TypeVar("K")
 
 
 def get_env_var(name: str, default: str | None = None) -> str:
@@ -78,7 +78,10 @@ def singleline(text: str) -> str:
     return dedent(text).replace("\n", " ")
 
 
-def timed_function(func: T) -> T:
+TimedFn = TypeVar("TimedFn", bound=Callable[..., Any])
+
+
+def timed_function(func: TimedFn) -> TimedFn:
     """
     A decorator for timing a function call.
 
@@ -101,7 +104,11 @@ def timed_function(func: T) -> T:
     return wrapper  # type: ignore
 
 
-def group_by(items: Sequence[T], fn: Callable[[T], K]) -> dict[K, list[T]]:
+def identity(item: T) -> T:
+    return item
+
+
+def group_by(items: Sequence[T], fn: Callable[[T], K] = identity) -> dict[K, list[T]]:
     """
     Groups items in a sequence by a key function.
 
@@ -132,6 +139,18 @@ def group_by(items: Sequence[T], fn: Callable[[T], K]) -> dict[K, list[T]]:
             groups[key].append(item)
         else:
             groups[key] = [item]
+    return groups
+
+
+def count_by(items: Sequence[T], fn: Callable[[T], K] = identity) -> dict[K, int]:
+    groups: dict[K, int] = {}
+
+    for item in items:
+        key = fn(item)
+        if key in groups:
+            groups[key] += 1
+        else:
+            groups[key] = 1
     return groups
 
 
