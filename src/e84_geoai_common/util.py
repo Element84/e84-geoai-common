@@ -3,9 +3,12 @@ from time import time
 
 import os
 import textwrap
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Sequence, TypeVar
 
 import humanize
+
+T = TypeVar("T", bound=Callable[..., Any])
+K = TypeVar("K", bound=Callable[..., Any])
 
 
 def get_env_var(name: str, default: str | None = None) -> str:
@@ -75,9 +78,6 @@ def singleline(text: str) -> str:
     return dedent(text).replace("\n", " ")
 
 
-T = TypeVar("T", bound=Callable[..., Any])
-
-
 def timed_function(func: T) -> T:
     """
     A decorator for timing a function call.
@@ -99,6 +99,40 @@ def timed_function(func: T) -> T:
         return result
 
     return wrapper  # type: ignore
+
+
+def group_by(items: Sequence[T], fn: Callable[[T], K]) -> dict[K, list[T]]:
+    """
+    Groups items in a sequence by a key function.
+
+    Parameters:
+    items (Sequence[T]): A sequence of items to be grouped.
+    fn (Callable[[T], K]): A function that takes an item and returns the key to group by.
+
+    Returns:
+    dict[K, list[T]]: A dictionary where keys are the results of the key function,
+                      and values are lists of items that produced that key.
+
+    Example:
+    # Group numbers by their remainder when divided by 3
+    numbers = [1, 2, 3, 4, 5, 6]
+    grouped = group_by(numbers, lambda x: x % 3)
+    # Result: {1: [1, 4], 2: [2, 5], 0: [3, 6]}
+
+    # Group strings by their length
+    words = ["cat", "dog", "mouse", "rat", "elephant"]
+    grouped = group_by(words, len)
+    # Result: {3: ["cat", "dog", "rat"], 5: ["mouse"], 8: ["elephant"]}
+    """
+    groups: dict[K, list[T]] = {}
+
+    for item in items:
+        key = fn(item)
+        if key in groups:
+            groups[key].append(item)
+        else:
+            groups[key] = [item]
+    return groups
 
 
 @dataclass
