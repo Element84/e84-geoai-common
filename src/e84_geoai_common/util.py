@@ -104,11 +104,9 @@ def timed_function(func: TimedFn) -> TimedFn:
     return wrapper  # type: ignore
 
 
-def identity(item: T) -> T:
-    return item
-
-
-def group_by(items: Sequence[T], fn: Callable[[T], K] = identity) -> dict[K, list[T]]:
+def group_by(
+    items: Sequence[T], fn: Callable[[T], K] = lambda x: x
+) -> dict[K, list[T]]:
     """
     Groups items in a sequence by a key function.
 
@@ -142,7 +140,7 @@ def group_by(items: Sequence[T], fn: Callable[[T], K] = identity) -> dict[K, lis
     return groups
 
 
-def count_by(items: Sequence[T], fn: Callable[[T], K] = identity) -> dict[K, int]:
+def count_by(items: Sequence[T], fn: Callable[[T], K] = lambda x: x) -> dict[K, int]:
     groups: dict[K, int] = {}
 
     for item in items:

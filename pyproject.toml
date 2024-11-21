@@ -12,11 +12,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dependencies = [
-  "boto3>=1.35.20",
-  "boto3-stubs[bedrock-runtime]>=1.35.20",
-  "pydantic>=2.9.1",
+  "boto3>=1.35.66",
+  "boto3-stubs[bedrock-runtime]>=1.35.66",
+  "pydantic>=2.10.0",
   "shapely>=2.0.6",
-  "types-shapely>=2.0.0.20240820",
+  "types-shapely>=2.0.0.20241112",
   "humanize>=4.11.0"
 ]
 dynamic = ["version"]
@@ -34,14 +34,14 @@ Github = "https://github.com/Element84/e84-geoai-common"
 
 [project.optional-dependencies]
 debugging = [
-    "folium>=0.17.0"
+    "folium>=0.18.0"
 ]
 dev = [
   "pytest>=8.3.3",
   "ipykernel>=6.29.5",
-  "black>=24.8.0",
-  "pyright>=1.1.381",
-  "build>=1.2.2",
-  "pre-commit>=3.8.0",
-  "pre-commit-hooks>=4.6.0"
+  "black>=24.10.0",
+  "pyright>=1.1.389",
+  "build>=1.2.2.post1",
+  "pre-commit>=4.0.1",
+  "pre-commit-hooks>=5.0.0"
 ]

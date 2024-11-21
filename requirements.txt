@@ -6,13 +6,13 @@ appnope==0.1.4
     # via ipykernel
 asttokens==2.4.1
     # via stack-data
-black==24.8.0
+black==24.10.0
     # via e84-geoai-common (pyproject.toml)
-boto3==1.35.20
+boto3==1.35.66
     # via e84-geoai-common (pyproject.toml)
-boto3-stubs==1.35.20
+boto3-stubs==1.35.66
     # via e84-geoai-common (pyproject.toml)
-botocore==1.35.20
+botocore==1.35.66
     # via
     #   boto3
     #   s3transfer
@@ -20,7 +20,7 @@ botocore-stubs==1.35.20
     # via boto3-stubs
 branca==0.7.2
     # via folium
-build==1.2.2
+build==1.2.2.post1
     # via e84-geoai-common (pyproject.toml)
 certifi==2024.8.30
     # via requests
@@ -46,7 +46,7 @@ executing==2.1.0
     # via stack-data
 filelock==3.16.1
     # via virtualenv
-folium==0.17.0
+folium==0.18.0
     # via e84-geoai-common (pyproject.toml)
 humanize==4.11.0
     # via e84-geoai-common (pyproject.toml)
@@ -116,9 +116,9 @@ platformdirs==4.3.3
     #   virtualenv
 pluggy==1.5.0
     # via pytest
-pre-commit==3.8.0
+pre-commit==4.0.1
     # via e84-geoai-common (pyproject.toml)
-pre-commit-hooks==4.6.0
+pre-commit-hooks==5.0.0
     # via e84-geoai-common (pyproject.toml)
 prompt-toolkit==3.0.47
     # via ipython
@@ -128,15 +128,15 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
-pydantic==2.9.1
+pydantic==2.10.0
     # via e84-geoai-common (pyproject.toml)
-pydantic-core==2.23.3
+pydantic-core==2.27.0
     # via pydantic
 pygments==2.18.0
     # via ipython
 pyproject-hooks==1.1.0
     # via build
-pyright==1.1.381
+pyright==1.1.389
     # via e84-geoai-common (pyproject.toml)
 pytest==8.3.3
     # via e84-geoai-common (pyproject.toml)
@@ -188,7 +188,7 @@ types-awscrt==0.21.5
     # via botocore-stubs
 types-s3transfer==0.10.2
     # via boto3-stubs
-types-shapely==2.0.0.20240820
+types-shapely==2.0.0.20241112
     # via e84-geoai-common (pyproject.toml)
 typing-extensions==4.12.2
     # via
@@ -198,6 +198,7 @@ typing-extensions==4.12.2
     #   mypy-boto3-bedrock-runtime
     #   pydantic
     #   pydantic-core
+    #   pyright
 urllib3==2.2.3
     # via
     #   botocore
