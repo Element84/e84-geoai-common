@@ -2,10 +2,13 @@
 
 import json
 import math
-from typing import Any
+from dataclasses import dataclass
+from typing import Annotated, Any, Callable, cast
+
 import shapely
 import shapely.geometry
-
+from pydantic import GetCoreSchemaHandler, PlainSerializer
+from pydantic_core import CoreSchema, core_schema
 from shapely import GeometryCollection
 from shapely.geometry.base import BaseGeometry
 
@@ -185,3 +188,45 @@ def add_buffer(g: BaseGeometry, distance_km: float) -> BaseGeometry:
     # but works for our current use cases.
 
     return g.buffer((lon_distance + lat_distance) / 2.0)
+
+
+def _serialize_geometry(g: BaseGeometry) -> dict[str, Any]:
+    return g.__geo_interface__
+
+
+@dataclass(frozen=True)
+class _BaseGeometryValidator:
+
+    def validate_geometry(
+        self,
+        value: Any,
+        handler: Callable[[BaseGeometry], BaseGeometry],
+    ):
+        if isinstance(value, dict):
+            result = handler(geometry_from_geojson_dict(cast(dict[str, Any], value)))
+        elif isinstance(value, BaseGeometry):
+            result = handler(value)
+        else:
+            raise Exception(
+                "geometry must be a geojson feature dictionary or a shapely geometry"
+            )
+
+        return result
+
+    def __get_pydantic_core_schema__(
+        self,
+        source_type: Any,
+        handler: GetCoreSchemaHandler,
+    ) -> CoreSchema:
+        return core_schema.no_info_wrap_validator_function(
+            self.validate_geometry,
+            handler(source_type),
+        )
+
+
+# Creates an annotated type for geometry that allows serialization and parsing of geometry.
+GeometryWithSerialization = Annotated[
+    BaseGeometry,
+    PlainSerializer(_serialize_geometry),
+    _BaseGeometryValidator(),
+]
