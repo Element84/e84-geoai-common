@@ -12,9 +12,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dependencies = [
-  "boto3>=1.35.66",
-  "boto3-stubs[bedrock-runtime]>=1.35.66",
-  "pydantic>=2.10.0",
+  "boto3>=1.35.71",
+  "boto3-stubs[bedrock-runtime]>=1.35.71",
+  "pydantic>=2.10.2",
   "shapely>=2.0.6",
   "types-shapely>=2.0.0.20241112",
   "humanize>=4.11.0"
