@@ -16,7 +16,7 @@ dependencies = [
   "boto3-stubs[bedrock-runtime]>=1.35.20",
   "pydantic>=2.9.1",
   "shapely>=2.0.6",
-  "types-shapely>=2.0.0.20240820"
+  "types-shapely>=2.0.0.20240820",
 ]
 dynamic = ["version"]
 
@@ -24,17 +24,13 @@ dynamic = ["version"]
 
 [tool.pytest.ini_options]
 pythonpath = "src"
-testpaths=[
-  "tests"
-]
+testpaths = ["tests"]
 
 [project.urls]
 Github = "https://github.com/Element84/e84-geoai-common"
 
 [project.optional-dependencies]
-debugging = [
-    "folium>=0.17.0"
-]
+debugging = ["folium>=0.17.0"]
 dev = [
   "pytest>=8.3.3",
   "ipykernel>=6.29.5",
@@ -42,5 +38,22 @@ dev = [
   "pyright>=1.1.381",
   "build>=1.2.2",
   "pre-commit>=3.8.0",
-  "pre-commit-hooks>=4.6.0"
+  "pre-commit-hooks>=4.6.0",
 ]
+
+
+[tool.pyright]
+include = ["src/"]
+ignore = ["**/tests/**", "**/venv/**", "*.pyc"]
+typeCheckingMode = "strict"
+reportGeneralTypeIssues = true
+reportImplicitStringConcatenation = "none"
+reportPropertyTypeMismatch = "error"
+reportShadowedImports = "error"
+reportTypedDictNotRequiredAccess = "none"
+reportUninitializedInstanceVariable = "error"
+reportUnknownArgumentType = "error"
+reportUnknownMemberType = "error"
+reportUnknownVariableType = "error"
+reportUnnecessaryComparison = "error"
+reportIncompatibleVariableOverride = "none"
