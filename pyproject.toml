@@ -17,6 +17,7 @@ dependencies = [
   "pydantic>=2.9.1",
   "shapely>=2.0.6",
   "types-shapely>=2.0.0.20240820",
+  "function_schema>=0.4.4",
 ]
 dynamic = ["version"]
 
