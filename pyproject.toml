@@ -34,7 +34,7 @@ debugging = ["folium>=0.17.0"]
 dev = [
   "pytest>=8.3.3",
   "ipykernel>=6.29.5",
-  "black>=24.8.0",
+  "ruff>=0.6.8",
   "pyright>=1.1.381",
   "build>=1.2.2",
   "pre-commit>=3.8.0",
@@ -57,3 +57,42 @@ reportUnknownMemberType = "error"
 reportUnknownVariableType = "error"
 reportUnnecessaryComparison = "error"
 reportIncompatibleVariableOverride = "none"
+
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+# http://docs.astral.sh/ruff/rules/
+select = ['ALL']
+ignore = [
+  # Unnecessary assignment before return statement
+  'RET504',
+  # Trailing comma missing
+  'COM812',
+  # Missing docstring for module
+  'D100',
+  # Missing docstring in magic method
+  'D105',
+  # 1 blank line required before class docstring
+  'D203',
+  # Multi-line docstring summary should start at the second line
+  'D213',
+]
+
+[tool.ruff.lint.per-file-ignores]
+'__init__.py' = [
+  # Module level import not at top of cell
+  'E402',
+  # Imported but unused
+  'F401',
+]
+'tests/**/*' = [
+  # Use of assert detected
+  'S101',
+  # Missing return type annotation for public function
+  'ANN201',
+  # Missing docstrings
+  'D1',
+  # Private member accessed
+  'SLF001',
+]
