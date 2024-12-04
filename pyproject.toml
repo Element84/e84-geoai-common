@@ -40,6 +40,7 @@ dev = [
   "build>=1.2.2",
   "pre-commit>=3.8.0",
   "pre-commit-hooks>=4.6.0",
+  "moto>=5.0.20",
 ]
 
 
