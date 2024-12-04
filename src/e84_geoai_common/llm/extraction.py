@@ -1,22 +1,23 @@
+import logging
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from e84_geoai_common.llm.core import LLM, InvokeLLMRequest, LLMMessage
-
+from e84_geoai_common.llm.core import LLM, LLMInferenceConfig, LLMMessage
 
 Model = TypeVar("Model", bound=BaseModel)
 
+log = logging.getLogger(__name__)
+
 
 class ExtractDataExample(BaseModel, Generic[Model]):
-    """
-    Represents an example data extraction scenario that can be used for building system prompts for
-    data extraction.
+    """Example data extraction scenario.
 
     Attributes:
-    - name (str): Name of the example.
-    - user_query (str): User's query for data extraction.
-    - structure (Model): Data structure to extract.
+        name (str): Name of the example.
+        user_query (str): User's query for data extraction.
+        structure (Model): Data structure to extract.
+
     """
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -26,14 +27,19 @@ class ExtractDataExample(BaseModel, Generic[Model]):
     structure: Model
 
     def to_str(self) -> str:
-        """
-        Returns a formatted string representation of the example data extraction scenario.
+        """Return formatted string representation of the example scenario.
 
         Returns:
-        str: Formatted string with example name, user query, and data structure in JSON format.
+                str: Formatted string with example name, user query, and data
+                structure in JSON format.
+
         """
-        query_json = f"```json\n{self.structure.model_dump_json(indent=2, exclude_none=True)}\n```"
-        return f'Example: {self.name}\nUser Query: "{self.user_query}"\n\n{query_json}'
+        json_str = self.structure.model_dump_json(indent=2, exclude_none=True)
+        query_json = f"```json\n{json_str}\n```"
+        return (
+            f'Example: {self.name}\nUser Query: "{self.user_query}"'
+            f"\n\n{query_json}"
+        )
 
 
 def extract_data_from_text(
@@ -43,24 +49,35 @@ def extract_data_from_text(
     system_prompt: str,
     user_prompt: str,
 ) -> Model:
-    """
-    Extracts data from text using a Language Model (LLM) by providing system and user prompts.
+    """Extract data from text using an LLM given system and user prompts.
 
     Args:
-    - llm (LLM): The Language Model instance used for data extraction.
-    - model_type (Type[Model]): The type of data model to be used for validation.
-    - system_prompt (str): The prompt for the system to process the user input.
-    - user_prompt (str): The user input text for data extraction.
+        llm (LLM): The Language Model instance used for data extraction.
+        model_type (Type[Model]): The type of data model to be used for
+            validation.
+        system_prompt (str): The prompt for the system to process the user
+            input.
+        user_prompt (str): The user input text for data extraction.
 
     Returns:
-    Model: The extracted data model validated against the specified model type.
+        Model: The extracted data model validated against the specified model
+            type.
+
     """
-    request = InvokeLLMRequest(
-        system=system_prompt, json_mode=True, messages=[LLMMessage(content=user_prompt)]
+    inference_cfg = LLMInferenceConfig(
+        system_prompt=system_prompt,
+        json_mode=True,
     )
-    resp = llm.invoke_model_with_request(request)
+    messages = [LLMMessage(role="user", content=user_prompt)]
+    resp = llm.prompt(messages=messages, inference_cfg=inference_cfg)
+    resp = resp[-1]
+    if isinstance(resp.content, str):
+        output_json = resp.content
+    else:
+        output_json = str(resp.content[-1])
     try:
-        return model_type.model_validate_json(resp)
-    except ValidationError as e:
-        print("Unable to parse response:", resp)
-        raise e
+        out = model_type.model_validate_json(output_json)
+    except ValidationError:
+        log.exception("Unable to parse LLM response: %s", resp)
+        raise
+    return out
