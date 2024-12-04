@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable, Sequence
-from typing import Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal
 
 import boto3
 import botocore.exceptions
@@ -12,6 +12,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
 from e84_geoai_common.util import timed_function
+
+if TYPE_CHECKING:
+    from typing import Self
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +71,7 @@ class ClaudeMessage(LLMMessage):
     )
 
     @classmethod
-    def from_llm_message(cls, message: LLMMessage) -> Self:
+    def from_llm_message(cls, message: LLMMessage) -> "Self":
         """Construct from an LLMMessage."""
         return cls.model_validate(message.model_dump())
 
@@ -120,7 +123,7 @@ class ClaudeTool(BaseModel):
     _func: Callable[..., Any]
 
     @classmethod
-    def from_function(cls, func: Callable[..., Any]) -> Self:
+    def from_function(cls, func: Callable[..., Any]) -> "Self":
         """Construct from a Python funtion."""
         schema = get_function_schema(func, format="claude")  # type: ignore[reportUnknownVariableType]
         out = cls.model_validate(schema)
@@ -188,7 +191,7 @@ class ClaudeInvokeLLMRequest(BaseModel):
         cls,
         cfg: LLMInferenceConfig,
         messages: Sequence[ClaudeMessage] | None = None,
-    ) -> Self:
+    ) -> "Self":
         """Construct from an LLMInferenceConfig."""
         messages = [] if messages is None else list(messages)
         response_prefix = cfg.response_prefix
