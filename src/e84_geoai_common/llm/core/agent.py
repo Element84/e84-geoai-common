@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
-from llm.core.llm import LLM, LLMInferenceConfig
+from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig
 
 
 class Agent(ABC):
@@ -14,5 +14,5 @@ class Agent(ABC):
 
     @property
     @abstractmethod
-    def prompt(self) -> str:
-        """The prompt used by the agent."""
+    def prompt_template(self) -> str:
+        """The prompt template used by the agent."""

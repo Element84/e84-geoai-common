@@ -1,9 +1,11 @@
-from llm.core.agent import Agent
-from llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
+"""Core LLM classes."""
+
+from e84_geoai_common.llm.core.agent import Agent
+from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
 
 __all__ = [
-    "Agent",
     "LLM",
+    "Agent",
     "LLMInferenceConfig",
     "LLMMessage",
 ]

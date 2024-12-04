@@ -1,3 +1,5 @@
+"""Common Geospatial AI/ML code for Element 84 projects."""
+
 import logging
 
 logging.basicConfig(

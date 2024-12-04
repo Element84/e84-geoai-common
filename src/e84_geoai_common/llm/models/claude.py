@@ -10,8 +10,8 @@ from function_schema.core import (  # type: ignore[reportMissingTypeStubs]
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from pydantic import BaseModel, ConfigDict, Field
 
-from llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
-from llm.util import timed_function
+from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
+from e84_geoai_common.util import timed_function
 
 log = logging.getLogger(__name__)
 
