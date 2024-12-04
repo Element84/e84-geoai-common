@@ -6,6 +6,8 @@
 
 set -e -o pipefail
 
+rm -rf .venv
+
 uv pip compile \
   --refresh \
   --all-extras \
@@ -13,3 +15,6 @@ uv pip compile \
   pyproject.toml \
   -o requirements.txt
 
+uv venv
+
+uv pip install -r requirements.txt
