@@ -10,8 +10,8 @@ from function_schema.core import (  # type: ignore[reportMissingTypeStubs]
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from pydantic import BaseModel, ConfigDict, Field
 
-from llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
-from llm.util import timed_function
+from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
+from e84_geoai_common.util import timed_function
 
 log = logging.getLogger(__name__)
 
@@ -255,7 +255,6 @@ class BedrockClaudeLLM(LLM):
         Args:
             model_id: Model ID. Defaults to the model ID for Claude 3 Haiku.
             client: Optional pre-initialized boto3 client. Defaults to None.
-
         """
         self.model_id = model_id
         self.client = client or boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]

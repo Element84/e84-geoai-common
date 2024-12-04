@@ -17,7 +17,6 @@ class ExtractDataExample(BaseModel, Generic[Model]):
         name (str): Name of the example.
         user_query (str): User's query for data extraction.
         structure (Model): Data structure to extract.
-
     """
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -32,7 +31,6 @@ class ExtractDataExample(BaseModel, Generic[Model]):
         Returns:
                 str: Formatted string with example name, user query, and data
                 structure in JSON format.
-
         """
         json_str = self.structure.model_dump_json(indent=2, exclude_none=True)
         query_json = f"```json\n{json_str}\n```"
@@ -62,7 +60,6 @@ def extract_data_from_text(
     Returns:
         Model: The extracted data model validated against the specified model
             type.
-
     """
     inference_cfg = LLMInferenceConfig(
         system_prompt=system_prompt,

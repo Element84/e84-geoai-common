@@ -1,6 +1,6 @@
 from moto import mock_aws
 
-from llm.models.claude import (
+from e84_geoai_common.llm.models.claude import (
     BedrockClaudeLLM,
     ClaudeResponse,
     ClaudeTextContent,

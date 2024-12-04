@@ -1,6 +1,7 @@
+from math import cos, pi, sin
+
 from shapely import GeometryCollection, LineString, Point
 from shapely.geometry.polygon import Polygon
-from math import sin, cos, pi
 
 from e84_geoai_common.geometry import geometry_point_count, simplify_geometry
 
@@ -62,7 +63,8 @@ def test_simplify_geometry():
     assert simplify_geometry(point) == point
 
     polygon = generate_circle(num_points=200)
-    # Simplifies to the same thing if already less than the set number of points
+    # Simplifies to the same thing if already less than the set number of
+    # points
     assert simplify_geometry(polygon, 300) == polygon
 
     assert geometry_point_count(simplify_geometry(polygon, 199)) <= 199

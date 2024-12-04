@@ -100,4 +100,6 @@ ignore = [
   'D1',
   # Private member accessed
   'SLF001',
+  # magic values
+  'PLR2004',
 ]

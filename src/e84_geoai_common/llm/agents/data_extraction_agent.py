@@ -4,7 +4,12 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from llm.core import LLM, Agent, LLMInferenceConfig, LLMMessage
+from e84_geoai_common.llm.core import (
+    LLM,
+    Agent,
+    LLMInferenceConfig,
+    LLMMessage,
+)
 
 if TYPE_CHECKING:
     from e84_geoai_common.llm.core import LLM
@@ -32,6 +37,14 @@ class DataExtractionAgent(Agent, Generic[ModelT]):
         data_model: type[ModelT],
         inference_cfg: LLMInferenceConfig | None = None,
     ) -> None:
+        """Construct.
+
+        Args:
+            llm (LLM): An LLM instance.
+            data_model (type[ModelT]): A Pydantic model.
+            inference_cfg (LLMInferenceConfig | None): Inference config.
+                Defaults to None.
+        """
         self.llm = llm
         self.tools = []
         self.data_model = data_model
@@ -70,5 +83,6 @@ class DataExtractionAgent(Agent, Generic[ModelT]):
         return out
 
     @property
-    def prompt(self) -> str:
+    def prompt_template(self) -> str:
+        """The prompt template used by the agent."""
         return self._prompt_template.template

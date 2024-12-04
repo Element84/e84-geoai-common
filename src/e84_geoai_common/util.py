@@ -10,74 +10,64 @@ log = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=Callable[..., Any])
 
-def get_env_var(name: str, default: str | None = None) -> str:
-    """
-    Retrieves the value of an environment variable.
-    """
-    value = os.getenv(name) or default
 
+def get_env_var(name: str, default: str | None = None) -> str:
+    """Retrieve the value of an environment variable."""
+    value = os.getenv(name) or default
     if value is None:
-        raise Exception(f"Env var {name} must be set")
+        msg = f"Env var {name} must be set"
+        raise ValueError(msg)
     return value
 
 
 def dedent(text: str) -> str:
-    """
-    Remove common leading whitespace from every line in a multi-line string.
+    """Remove common leading whitespace from every line in a multi-line string.
 
-    Parameters:
-    text (str): The multi-line string with potentially uneven indentation.
+    Args:
+        text (str): The multi-line string with potentially uneven indentation.
 
     Returns:
-    str: The modified string with common leading whitespace removed from every line.
-
-    Raises:
-    None
+        str: The modified string with common leading whitespace removed from
+        every line.
 
     Example:
-    text = '''
-        Lorem ipsum dolor sit amet,
-        consectetur adipiscing elit,
-        sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    '''
-    result = dedent(text)
-    print(result)
-    # Output:
-    # 'Lorem ipsum dolor sit amet,
-    # consectetur adipiscing elit,
-    # sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
+        text = '''
+            Lorem ipsum dolor sit amet,
+            consectetur adipiscing elit,
+            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        '''
+        result = dedent(text)
+        print(result)
+        # Output:
+        # 'Lorem ipsum dolor sit amet,
+        # consectetur adipiscing elit,
+        # sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
     """
     return textwrap.dedent(text).strip()
 
 
 def singleline(text: str) -> str:
-    """
-    Remove common leading whitespace from every line in a multi-line string and convert it into a single line.
+    """Remove common leading whitespace from every line in a multi-line string.
 
-    Parameters:
-    text (str): The multi-line string with potentially uneven indentation.
+    Args:
+        text (str): The multi-line string with potentially uneven indentation.
 
     Returns:
-    str: The modified string with common leading whitespace removed from every line and converted into a single line.
-
-    Raises:
-    None
+        str: The modified string with common leading whitespace removed from
+            every line and converted into a single line.
 
     Example:
-    text = '''
-        Lorem ipsum dolor sit amet,
-        consectetur adipiscing elit,
-        sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    '''
-    result = singleline(text)
-    print(result)
-    # Output:
-    # 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-    """
+        text = '''
+            Lorem ipsum dolor sit amet,
+            consectetur adipiscing elit,
+            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        '''
+        result = singleline(text)
+        print(result)
+        # Output:
+        # 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
+    """  # noqa: E501
     return dedent(text).replace("\n", " ")
-
-
-
 
 
 def timed_function(func: T) -> T:
@@ -91,7 +81,6 @@ def timed_function(func: T) -> T:
 
     Returns:
         Callable: The decorated function.
-
     """
 
     def wrapper(*args: list[Any], **kwargs: dict[str, Any]) -> Any:  # noqa: ANN401
