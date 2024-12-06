@@ -1,97 +1,94 @@
-import time
+import logging
 import os
 import textwrap
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from time import perf_counter
+from typing import Any, TypeVar
 
-
-def get_env_var(name: str, default: str | None = None) -> str:
-    """
-    Retrieves the value of an environment variable.
-    """
-    value = os.getenv(name) or default
-
-    if value is None:
-        raise Exception(f"Env var {name} must be set")
-    return value
-
-
-def dedent(text: str) -> str:
-    """
-    Remove common leading whitespace from every line in a multi-line string.
-
-    Parameters:
-    text (str): The multi-line string with potentially uneven indentation.
-
-    Returns:
-    str: The modified string with common leading whitespace removed from every line.
-
-    Raises:
-    None
-
-    Example:
-    text = '''
-        Lorem ipsum dolor sit amet,
-        consectetur adipiscing elit,
-        sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    '''
-    result = dedent(text)
-    print(result)
-    # Output:
-    # 'Lorem ipsum dolor sit amet,
-    # consectetur adipiscing elit,
-    # sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-    """
-    return textwrap.dedent(text).strip()
-
-
-def singleline(text: str) -> str:
-    """
-    Remove common leading whitespace from every line in a multi-line string and convert it into a single line.
-
-    Parameters:
-    text (str): The multi-line string with potentially uneven indentation.
-
-    Returns:
-    str: The modified string with common leading whitespace removed from every line and converted into a single line.
-
-    Raises:
-    None
-
-    Example:
-    text = '''
-        Lorem ipsum dolor sit amet,
-        consectetur adipiscing elit,
-        sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    '''
-    result = singleline(text)
-    print(result)
-    # Output:
-    # 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-    """
-    return dedent(text).replace("\n", " ")
+log = logging.getLogger(__name__)
 
 
 T = TypeVar("T", bound=Callable[..., Any])
 
 
-def timed_function(func: T) -> T:
-    """
-    A decorator for timing a function call.
+def get_env_var(name: str, default: str | None = None) -> str:
+    """Retrieve the value of an environment variable."""
+    value = os.getenv(name) or default
+    if value is None:
+        msg = f"Env var {name} must be set"
+        raise ValueError(msg)
+    return value
 
-    This decorator will print the execution time of the decorated function after it runs.
 
-    Parameters:
-    func (Callable): The function to be timed.
+def dedent(text: str) -> str:
+    """Remove common leading whitespace from every line in a multi-line string.
+
+    Args:
+        text (str): The multi-line string with potentially uneven indentation.
 
     Returns:
-    Callable: The decorated function.
+        str: The modified string with common leading whitespace removed from
+        every line.
+
+    Example:
+        text = '''
+            Lorem ipsum dolor sit amet,
+            consectetur adipiscing elit,
+            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        '''
+        result = dedent(text)
+        print(result)
+        # Output:
+        # 'Lorem ipsum dolor sit amet,
+        # consectetur adipiscing elit,
+        # sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
+    """
+    return textwrap.dedent(text).strip()
+
+
+def singleline(text: str) -> str:
+    """Remove common leading whitespace from every line in a multi-line string.
+
+    Args:
+        text (str): The multi-line string with potentially uneven indentation.
+
+    Returns:
+        str: The modified string with common leading whitespace removed from
+            every line and converted into a single line.
+
+    Example:
+        text = '''
+            Lorem ipsum dolor sit amet,
+            consectetur adipiscing elit,
+            sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+        '''
+        result = singleline(text)
+        print(result)
+        # Output:
+        # 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
+    """  # noqa: E501
+    return dedent(text).replace("\n", " ")
+
+
+def timed_function(func: T) -> T:
+    """Decorate a function to log execution time.
+
+    This decorator will print the execution time of the decorated function
+    after it finishes executing.
+
+    Args:
+        func (Callable): The function to be timed.
+
+    Returns:
+        Callable: The decorated function.
     """
 
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        start_time = time.time()  # capture the start time before executing
-        result = func(*args, **kwargs)  # execute the function
-        end_time = time.time()
-        print(f"{func.__name__} took {end_time - start_time} seconds to run.")
+    def wrapper(*args: list[Any], **kwargs: dict[str, Any]) -> Any:  # noqa: ANN401
+        start_time = perf_counter()
+        result = func(*args, **kwargs)
+        end_time = perf_counter()
+        diff = end_time - start_time
+        log.info("%s took %f seconds to run.", func.__name__, diff)
         return result
 
-    return wrapper  # type: ignore
+    return wrapper  # type: ignore[reportReturnType]

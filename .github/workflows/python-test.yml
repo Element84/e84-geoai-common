@@ -11,8 +11,7 @@ jobs:
   build:
     strategy:
       matrix:
-        python-version:
-          - "3.10"
+        python-version: ["3.10", "3.11", "3.12"]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,3 +37,5 @@ jobs:
         run: |
           . .venv/bin/activate
           scripts/test.sh
+        env:
+          AWS_DEFAULT_REGION: us-east-1
