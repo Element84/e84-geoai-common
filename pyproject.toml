@@ -26,9 +26,6 @@ enabled = true
 dev_template = "{tag}"
 dirty_template = "{tag}"
 
-[tool.setuptools_scm]
-local_scheme = "no-local-version"
-
 [tool.pytest.ini_options]
 pythonpath = "src"
 testpaths = ["tests"]
