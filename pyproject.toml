@@ -22,6 +22,7 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools_scm]
+version_scheme = "release-branch-semver"
 local_scheme = "no-local-version"
 
 [tool.pytest.ini_options]
