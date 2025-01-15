@@ -22,9 +22,7 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools_scm]
-version_scheme = "guess-next-dev"
-local_scheme = "no-local-version"
-tag_regex = "^(?:v)?(\\d+\\.\\d+\\.\\d+)$"
+version = { attr = "e84-geoai-common.version.__version__" }
 
 [tool.pytest.ini_options]
 pythonpath = "src"
