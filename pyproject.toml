@@ -21,8 +21,11 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[tool.setuptools.dynamic]
+version = { attr = "src.e84_geoai_common.version.__version__" }
+
 [tool.setuptools_scm]
-version = { attr = "src.e84-geoai-common.version.__version__" }
+local_scheme = "no-local-version"
 
 [tool.pytest.ini_options]
 pythonpath = "src"
