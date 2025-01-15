@@ -3,7 +3,7 @@ name: Publish to Test PyPI
 on:
   push:
     branches:
-      - brian/pypi-build
+      - brian/pypi-build #temporary comment to test new pypi deploy based off of github commit
 
 jobs:
   publish-testpypi:
