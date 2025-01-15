@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/e84-geoai-common/
+      url: https://pypi.org/p/e84-geoai-common/
     permissions:
       id-token: write
     if: ${{ github.repository }} == 'Element84/e84-geoai-common'
