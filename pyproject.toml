@@ -22,8 +22,9 @@ dependencies = [
 dynamic = ["version"]
 
 [tool.setuptools_scm]
-version_scheme = "release-branch-semver"
+version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
+tag_regex = "^(?:v)?(\\d+\\.\\d+\\.\\d+)$"
 
 [tool.pytest.ini_options]
 pythonpath = "src"
