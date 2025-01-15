@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools_scm"]
+requires = ["setuptools", "setuptools_scm","setuptools-git-versioning"]
 build-backend = "setuptools.build_meta"
 
 
@@ -21,8 +21,10 @@ dependencies = [
 ]
 dynamic = ["version"]
 
-[tool.setuptools.dynamic]
-version = { attr = "e84_geoai_common.version.__version__" }
+[tool.setuptools-git-versioning]
+enabled = true
+dev_template = "{tag}"
+dirty_template = "{tag}"
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"

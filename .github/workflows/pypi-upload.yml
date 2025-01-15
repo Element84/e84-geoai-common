@@ -3,7 +3,7 @@ name: Publish to Test PyPI
 on:
   push:
     branches:
-      - brian/pypi-build #temporary comment to test new pypi deploy based off of github commit
+      - brian/pypi-build
 
 jobs:
   publish-testpypi:
@@ -31,7 +31,7 @@ jobs:
       - name: Build package
         run: python -m build
 
-      - name: Publish to PyPI
+      - name: Publish to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
