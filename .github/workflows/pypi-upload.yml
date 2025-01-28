@@ -1,14 +1,9 @@
 name: Publish to Test PyPI
 
-#TODO before merging to main change this to
-# on:
-#   release:
-#     types:
-#       - published
 on:
-  push:
-    branches:
-      - brian/pypi-build
+  release:
+    types:
+      - published
 
 jobs:
   publish-testpypi:
