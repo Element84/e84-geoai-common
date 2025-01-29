@@ -18,3 +18,23 @@ Contains Geospatial AI/ML related code
 1. Verify tests pass `scripts/test.sh`.
 1. Commit and push your changes.
 	- Note: if using Gitkraken, launch it from the terminal (with `gitkraken`) with the correct python environment activated to ensure that it can use the pre-commit hooks.
+
+## Contributions
+
+We are happy to take contributions! It is best to get in touch with the maintainers about larger features or design changes *before* starting the work, as it will make the process of accepting changes smoother.
+
+## Contributor License Agreement (CLA)
+
+Everyone who contributes code to E84 Geoai Common will be asked to sign a CLA, which is based off of the Apache CLA.
+
+- Download a copy of **one of** the following from the `docs/cla` directory in this repository:
+
+  - Individual Contributor (You're using your time): `2025_1_24-E84-Geoai-Common-Open-Source-Contributor-Agreement-Individual.pdf`
+  - Corporate Contributor (You're using company time): `2025_1_24-E84-Geoai-Common-Open-Source-Contributor-Agreement-Corporate.pdf`
+
+- Sign the CLA -- either physically on a printout or digitally using appropriate PDF software.
+
+- Send the signed CLAs to Element 84 via **one of** the following methods:
+
+  - Emailing the document to contracts@element84.com
+  - Mailing a hardcopy to: ``Element 84, 210 N. Lee Street Suite 203 Alexandria, VA 22314, USA``.
