@@ -29,8 +29,8 @@ Everyone who contributes code to E84 Geoai Common will be asked to sign a CLA, w
 
 - Download a copy of **one of** the following from the `docs/cla` directory in this repository:
 
-  - Individual Contributor (You're using your time): `2025_1_24-E84-Geoai-Common-Open-Source-Contributor-Agreement-Individual.pdf`
-  - Corporate Contributor (You're using company time): `2025_1_24-E84-Geoai-Common-Open-Source-Contributor-Agreement-Corporate.pdf`
+  - Individual Contributor (You're using your time): `2025_1_29-E84-Geoai-Common-Open-Source-Contributor-Agreement-Individual.pdf`
+  - Corporate Contributor (You're using company time): `2025_1_29-E84-Geoai-Common-Open-Source-Contributor-Agreement-Corporate.pdf`
 
 - Sign the CLA -- either physically on a printout or digitally using appropriate PDF software.
 
