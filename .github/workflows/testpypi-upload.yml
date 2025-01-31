@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: Publish to Test PyPI
 
 on:
   release:
@@ -6,10 +6,10 @@ on:
       - published
 
 jobs:
-  publish-pypi:
+  publish-testpypi:
     runs-on: ubuntu-latest
     environment:
-      name: pypi
+      name: testpypi
       url: https://pypi.org/p/e84-geoai-common/
     permissions:
       id-token: write
@@ -31,7 +31,8 @@ jobs:
       - name: Build package
         run: python -m build
 
-      - name: Publish to PyPI
+      - name: Publish to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          repository-url: https://test.pypi.org/legacy/
           verbose: true
