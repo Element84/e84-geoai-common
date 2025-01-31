@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools_scm"]
+requires = ["setuptools", "setuptools_scm","setuptools-git-versioning"]
 build-backend = "setuptools.build_meta"
 
 
@@ -21,7 +21,10 @@ dependencies = [
 ]
 dynamic = ["version"]
 
-[tool.setuptools_scm]
+[tool.setuptools-git-versioning]
+enabled = true
+dev_template = "{tag}"
+dirty_template = "{tag}"
 
 [tool.pytest.ini_options]
 pythonpath = "src"
