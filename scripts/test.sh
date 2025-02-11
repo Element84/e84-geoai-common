@@ -2,4 +2,4 @@
 
 set -e -o pipefail
 
-pytest
+PYTHONPATH=src:tests pytest

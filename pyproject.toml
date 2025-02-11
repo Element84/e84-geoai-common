@@ -9,7 +9,7 @@ authors = [{ name = "Jason Gilman", email = "jason@element84.com" }]
 maintainers = [{ name = "Jason Gilman", email = "jason@element84.com" }]
 description = "Contains common Geospatial AI/ML code for Element 84 projects."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 dependencies = [
   "boto3>=1.35.20",
@@ -48,8 +48,9 @@ dev = [
 
 
 [tool.pyright]
-include = ["src/"]
-ignore = ["**/tests/**", "**/venv/**", "*.pyc"]
+pythonVersion = "3.12"
+include = ["src/", "tests/"]
+ignore = ["**/venv/**", "*.pyc"]
 typeCheckingMode = "strict"
 reportGeneralTypeIssues = true
 reportImplicitStringConcatenation = "none"
@@ -64,7 +65,7 @@ reportUnnecessaryComparison = "error"
 reportIncompatibleVariableOverride = "none"
 
 [tool.ruff]
-line-length = 79
+line-length = 100
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -85,6 +86,8 @@ ignore = [
   'D203',
   # Multi-line docstring summary should start at the second line
   'D213',
+  # Allow messages in exception declarations
+  'TRY003', 'EM101'
 ]
 
 [tool.ruff.lint.per-file-ignores]

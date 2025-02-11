@@ -34,10 +34,7 @@ class ExtractDataExample(BaseModel, Generic[Model]):
         """
         json_str = self.structure.model_dump_json(indent=2, exclude_none=True)
         query_json = f"```json\n{json_str}\n```"
-        return (
-            f'Example: {self.name}\nUser Query: "{self.user_query}"'
-            f"\n\n{query_json}"
-        )
+        return f'Example: {self.name}\nUser Query: "{self.user_query}"\n\n{query_json}'
 
 
 def extract_data_from_text(
@@ -67,14 +64,9 @@ def extract_data_from_text(
     )
     messages = [LLMMessage(role="user", content=user_prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=inference_cfg)
-    resp = resp[-1]
-    if isinstance(resp.content, str):
-        output_json = resp.content
-    else:
-        output_json = str(resp.content[-1])
     try:
-        out = model_type.model_validate_json(output_json)
-    except ValidationError:
+        out = model_type.model_validate_json(resp.to_text_only())
+    except (ValidationError, TypeError):
         log.exception("Unable to parse LLM response: %s", resp)
         raise
     return out

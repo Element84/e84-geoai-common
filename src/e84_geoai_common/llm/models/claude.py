@@ -1,25 +1,26 @@
 import logging
-from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Literal
+from collections.abc import Sequence
+from typing import Any, Literal
 
 import boto3
 import botocore.exceptions
-from function_schema.core import (  # type: ignore[reportMissingTypeStubs]
-    get_function_schema,  # type: ignore[reportUnknownVariableType]
-)
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from pydantic import BaseModel, ConfigDict, Field
 
-from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
+from e84_geoai_common.llm.core.llm import (
+    LLM,
+    Base64ImageContent,
+    LLMInferenceConfig,
+    LLMMessage,
+    TextContent,
+)
 from e84_geoai_common.util import timed_function
-
-if TYPE_CHECKING:
-    from typing import Self
 
 log = logging.getLogger(__name__)
 
 # See https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html
 ANTHROPIC_API_VERSION = "bedrock-2023-05-31"
+
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude 3 Haiku": "anthropic.claude-3-haiku-20240307-v1:0",
@@ -35,109 +36,57 @@ CLAUDE_BEDROCK_MODEL_IDS = {
 class ClaudeTextContent(BaseModel):
     """Claude text context model."""
 
+    model_config = ConfigDict(strict=True, extra="forbid")
+
     type: Literal["text"] = "text"
-    text: str
-
-    def __str__(self) -> str:
-        return self.text
-
-
-class ClaudeToolUseContent(BaseModel):
-    """Claude tool-use request model."""
-
-    type: Literal["tool_use"] = "tool_use"
-    id: str
-    name: str
-    input: dict[str, Any]
-
-
-class ClaudeToolResultContent(BaseModel):
-    """Claude tool result model."""
-
-    type: Literal["tool_result"] = "tool_result"
-    tool_use_id: str
     content: str
 
 
-class ClaudeMessage(LLMMessage):
+class ClaudeImageSource(BaseModel):
+    """An image encoded for communication with an LLM."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["base64"] = "base64"
+    media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
+    data: str
+
+
+class ClaudeImageContent(BaseModel):
+    """Claude text context model."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["image"] = "image"
+    source: ClaudeImageSource
+
+
+class ClaudeMessage(BaseModel):
     """Claude message base model."""
 
+    model_config = ConfigDict(strict=True, extra="forbid")
+
     role: Literal["assistant", "user"]
-    content: (
-        str
-        | Sequence[
-            ClaudeTextContent | ClaudeToolUseContent | ClaudeToolResultContent
-        ]
-    )
+    content: str | Sequence[ClaudeTextContent | ClaudeImageContent]
 
-    @classmethod
-    def from_llm_message(cls, message: LLMMessage) -> "Self":
-        """Construct from an LLMMessage."""
-        return cls.model_validate(message.model_dump())
+    @staticmethod
+    def from_llm_message(msg: LLMMessage) -> "ClaudeMessage":
+        """Converts the generic LLM Message into a ClaudeMessage."""
 
+        def _handle_content(
+            subcontent: TextContent | Base64ImageContent,
+        ) -> ClaudeTextContent | ClaudeImageContent:
+            if isinstance(subcontent, TextContent):
+                return ClaudeTextContent(content=subcontent.text)
+            return ClaudeImageContent(
+                source=ClaudeImageSource(media_type=subcontent.media_type, data=subcontent.data)
+            )
 
-class ClaudeUserMessage(ClaudeMessage):
-    """Claude user message model."""
-
-    role: Literal["user"] = "user"
-    content: str | Sequence[ClaudeTextContent | ClaudeToolResultContent]
-
-
-class ClaudeAssistantMessage(ClaudeMessage):
-    """Claude assistant message model."""
-
-    role: Literal["assistant"] = "assistant"
-    content: str | Sequence[ClaudeTextContent | ClaudeToolUseContent]
-
-
-class ClaudeUsageInfo(BaseModel):
-    """Claude usage-info model."""
-
-    input_tokens: int
-    output_tokens: int
-
-
-class ClaudeResponse(BaseModel):
-    """Claude response model."""
-
-    id: str
-    type: Literal["message"] = "message"
-    role: Literal["assistant"] = "assistant"
-    content: Sequence[ClaudeTextContent | ClaudeToolUseContent]
-    model: str
-    stop_reason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
-    stop_sequence: str | None
-    usage: ClaudeUsageInfo
-
-    def to_message(self) -> ClaudeMessage:
-        """Convert to a ClaudeAssistantMessage."""
-        return ClaudeAssistantMessage(role=self.role, content=self.content)
-
-
-class ClaudeTool(BaseModel):
-    """Representation of a tool that Claude can use."""
-
-    name: str
-    description: str
-    input_schema: dict[str, Any]
-    _func: Callable[..., Any]
-
-    @classmethod
-    def from_function(cls, func: Callable[..., Any]) -> "Self":
-        """Construct from a Python funtion."""
-        schema = get_function_schema(func, format="claude")  # type: ignore[reportUnknownVariableType]
-        out = cls.model_validate(schema)
-        out._func = func  # noqa: SLF001
-        return out
-
-    def use(self, tool_use: ClaudeToolUseContent) -> ClaudeUserMessage:
-        """Use tool and return the result as a ClaudeUserMessage."""
-        func_out = self._func(**tool_use.input)
-        result = ClaudeToolResultContent(
-            tool_use_id=tool_use.id, content=str(func_out)
-        )
-        msg = ClaudeUserMessage(content=[result])
-        return msg
+        if isinstance(msg.content, str):
+            content = msg.content
+        else:
+            content = [_handle_content(subcontent) for subcontent in msg.content]
+        return ClaudeMessage(role=msg.role, content=content)
 
 
 class ClaudeToolChoice(BaseModel):
@@ -147,7 +96,15 @@ class ClaudeToolChoice(BaseModel):
     name: str | None = None
     # disable_parallel_tool_use is documented in Anthropic docs but seems to
     # not be supported in Bedrock
-    # disable_parallel_tool_use: bool | None = None  # noqa: ERA001
+    # disable_parallel_tool_use: bool | None = None
+
+
+class ClaudeTool(BaseModel):
+    """Representation of a tool that Claude can use."""
+
+    name: str
+    description: str | None = None
+    input_schema: dict[str, Any]
 
 
 class ClaudeInvokeLLMRequest(BaseModel):
@@ -156,91 +113,81 @@ class ClaudeInvokeLLMRequest(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     anthropic_version: str = ANTHROPIC_API_VERSION
-    messages: list[ClaudeMessage] = Field(
-        default_factory=list, description="List of LLM Messages"
-    )
+
+    max_tokens: int = Field(default=1000, description="Maximum number of output tokens")
+
+    messages: list[ClaudeMessage] = Field(default_factory=list, description="List of LLM Messages")
+
+    stop_sequences: list[str] | None = None
+
     system: str | None = Field(default=None, description="System Prompt")
-    tools: list[ClaudeTool] | None = Field(
-        default=None, description="List of tools that the model may call."
+
+    temperature: float = Field(
+        default=0,
+        description="Temperature control for randomness. Closer to zero = more deterministic.",
     )
+
     tool_choice: ClaudeToolChoice | None = Field(
         default=None,
         description="Whether the model should use a specific "
         "tool, or any tool, or decide by itself.",
     )
-    max_tokens: int = Field(
-        default=1000, description="Maximum number of output tokens"
+
+    tools: list[ClaudeTool] | None = Field(
+        default=None, description="List of tools that the model may call."
     )
-    temperature: float = Field(
-        default=0,
-        description="Temperature control for randomness. "
-        "Closer to zero = more deterministic.",
-    )
-    top_p: float | None = Field(
-        default=None, description="Top P for nucleus sampling"
-    )
+
     top_k: int | None = Field(default=None, description="Top K for sampling")
-    response_prefix: str | None = Field(
-        default=None,
-        description="Make Claude continue a pre-filled response instead of "
-        'starting from sratch. Can be set to "{" to force "JSON mode".',
-    )
 
-    @classmethod
-    def from_inference_config(
-        cls,
-        cfg: LLMInferenceConfig,
-        messages: Sequence[ClaudeMessage] | None = None,
-    ) -> "Self":
-        """Construct from an LLMInferenceConfig."""
-        messages = [] if messages is None else list(messages)
-        response_prefix = cfg.response_prefix
-        if cfg.json_mode:
-            if response_prefix is not None:
-                msg = "response_prefix not supported with json_mode=True."
-                raise ValueError(msg)
-            response_prefix = "{"
+    top_p: float | None = Field(default=None, description="Top P for nucleus sampling")
 
-        tools = None
-        tool_choice = None
-        if cfg.tools is not None:
-            tools = [ClaudeTool.from_function(f) for f in cfg.tools]
-            if cfg.tool_choice is None:
-                tool_choice = ClaudeToolChoice(type="auto")
-            elif cfg.tool_choice in ("auto", "any"):
-                tool_choice = ClaudeToolChoice(type=cfg.tool_choice)
-            else:
-                tool_choice = ClaudeToolChoice(
-                    type="tool", name=cfg.tool_choice
-                )
-            log.info(tool_choice)
-        req = cls(
-            messages=messages,
-            system=cfg.system_prompt,
-            tools=tools,
-            tool_choice=tool_choice,
-            max_tokens=cfg.max_tokens,
-            temperature=cfg.temperature,
-            top_k=cfg.top_k,
-            top_p=cfg.top_p,
-            response_prefix=response_prefix,
-        )
-        return req
 
-    def to_request_body(self) -> str:
-        """Convert to JSON request body."""
-        if len(self.messages) == 0:
-            msg = "Must specify at least one message."
-            raise ValueError(msg)
-        if self.response_prefix is not None:
-            prefilled_response = ClaudeAssistantMessage(
-                content=self.response_prefix
-            )
-            self.messages.append(prefilled_response)
-        body = self.model_dump_json(
-            exclude_none=True, exclude={"response_prefix"}
-        )
-        return body
+#################################################################################
+# Response objects
+
+
+class ClaudeTextResponse(BaseModel):
+    """Represents a text use response from Claude."""
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    type: Literal["text"] = "text"
+    text: str
+
+
+class ClaudeToolUseResponse(BaseModel):
+    """Represents a tool use response from Claude."""
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    type: Literal["tool_use"] = "tool_use"
+    id: str
+    input: dict[str, Any]
+    name: str
+
+
+class ClaudeUsageInfo(BaseModel):
+    """Claude usage-info model."""
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    input_tokens: int
+    output_tokens: int
+
+
+class ClaudeResponse(BaseModel):
+    """Claude response model."""
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    content: Sequence[ClaudeTextResponse | ClaudeToolUseResponse]
+    id: str
+    model: str
+    role: Literal["assistant"] = "assistant"
+    stop_reason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
+    stop_sequence: str | None = None
+    type: Literal["message"]
+    usage: ClaudeUsageInfo
 
 
 class BedrockClaudeLLM(LLM):
@@ -262,96 +209,70 @@ class BedrockClaudeLLM(LLM):
         self.model_id = model_id
         self.client = client or boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]
 
+    def _create_request(
+        self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
+    ) -> ClaudeInvokeLLMRequest:
+        if config.json_mode:
+            messages = [*messages, LLMMessage(role="assistant", content="{")]
+
+        return ClaudeInvokeLLMRequest(
+            max_tokens=config.max_tokens,
+            system=config.system_prompt,
+            temperature=config.temperature,
+            top_k=config.top_k,
+            top_p=config.top_p,
+            messages=[ClaudeMessage.from_llm_message(msg) for msg in messages],
+        )
+
     @timed_function
     def prompt(
         self,
         messages: Sequence[LLMMessage],
         inference_cfg: LLMInferenceConfig,
-        *,
-        auto_use_tools: bool = False,
-    ) -> list[ClaudeMessage]:
+    ) -> LLMMessage:
         """Prompt the LLM with a message and optional conversation history."""
         if len(messages) == 0:
-            msg = "Must specify at least one message."
-            raise ValueError(msg)
-        messages = [ClaudeMessage.from_llm_message(m) for m in messages]
-        request = ClaudeInvokeLLMRequest.from_inference_config(
-            inference_cfg, messages
-        )
+            raise ValueError("Must specify at least one message.")
+        request = self._create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        if response.stop_reason == "tool_use" and auto_use_tools:
-            assert request.tools is not None  # noqa: S101
-            log.info("Tool-use requested:")
-            log.info(response.content)
-            tool_result_msgs = self.use_tools(response.content, request.tools)
-            log.info("Tool-use results:")
-            log.info(tool_result_msgs)
-            new_messages = [
-                *messages,
-                response.to_message(),
-                *tool_result_msgs,
-            ]
-            return self.prompt(
-                new_messages,
-                inference_cfg,
-            )
-        return [*messages, response.to_message()]
+
+        def _response_content_to_text(
+            index: int, c: ClaudeTextResponse | ClaudeToolUseResponse
+        ) -> TextContent:
+            if isinstance(c, ClaudeToolUseResponse):
+                raise TypeError("Did not expect a tool use response")
+            text = c.text
+            if index == 0 and inference_cfg.json_mode:
+                text = "{" + text
+
+            return TextContent(text=text)
+
+        return LLMMessage(
+            role="assistant",
+            content=[_response_content_to_text(i, c) for i, c in enumerate(response.content)],
+        )
 
     @timed_function
-    def invoke_model_with_request(
-        self, request: ClaudeInvokeLLMRequest
-    ) -> ClaudeResponse:
+    def invoke_model_with_request(self, request: ClaudeInvokeLLMRequest) -> ClaudeResponse:
         """Invoke model with request and get a response back."""
-        response_body = self._make_client_request(request)
-        claude_response = self._parse_response(response_body, request)
-        return claude_response
-
-    def use_tools(
-        self,
-        content: Sequence[ClaudeTextContent | ClaudeToolUseContent],
-        tools: list[ClaudeTool],
-    ) -> list[ClaudeUserMessage]:
-        """Fulfill all tool-use requests and return response messages."""
-        tools_dict = {t.name: t for t in tools}
-        out_messages: list[ClaudeUserMessage] = []
-        for block in content:
-            if not isinstance(block, ClaudeToolUseContent):
-                continue
-            tool = tools_dict[block.name]
-            out_messages.append(tool.use(block))
-        return out_messages
-
-    def _parse_response(
-        self, response_body: str, request: ClaudeInvokeLLMRequest
-    ) -> ClaudeResponse:
-        """Parse raw JSON response into a ClaudeResponse."""
-        response = ClaudeResponse.model_validate_json(response_body)
-        if request.response_prefix is not None:
-            response = self._add_prefix_to_response(
-                response, request.response_prefix
-            )
-        return response
-
-    def _make_client_request(self, request: ClaudeInvokeLLMRequest) -> str:
-        """Make model invocation request and return raw JSON response."""
-        request_body = request.to_request_body()
         try:
             response = self.client.invoke_model(
-                modelId=self.model_id, body=request_body
+                modelId=self.model_id, body=request.model_dump_json(exclude_none=True)
             )
-        except botocore.exceptions.ClientError as e:
-            log.error("Failed with %s", e)  # noqa: TRY400
-            log.error("Request body: %s", request_body)  # noqa: TRY400
+        except botocore.exceptions.ClientError:
+            log.exception("Request body: %s", request.model_dump_json())
             raise
         response_body = response["body"].read().decode("UTF-8")
-        return response_body
+        return ClaudeResponse.model_validate_json(response_body)
 
-    def _add_prefix_to_response(
-        self, response: ClaudeResponse, prefix: str
-    ) -> ClaudeResponse:
-        """Prepend prefix to the text of the first text-content block."""
-        for content_block in response.content:
-            if isinstance(content_block, ClaudeTextContent):
-                content_block.text = prefix + content_block.text
-                break
-        return response
+    # FUTURE implement tool use
+
+
+#########################
+# Code for manual testing
+# ruff: noqa: ERA001
+
+# llm = BedrockClaudeLLM()
+# config = LLMInferenceConfig(json_mode=True)
+# resp = llm.prompt([LLMMessage(content="Create a list of the numbers 1 through 5")], config)
+# resp
