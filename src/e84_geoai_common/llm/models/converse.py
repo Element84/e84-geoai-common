@@ -448,7 +448,6 @@ class BedrockConverseLLM(LLM):
             response = self._add_prefix_to_response(
                 response, request.response_prefix
             )
-        log.info(response)
         return response
 
     def _make_client_request(self, request: ConverseInvokeLLMRequest) -> str:
