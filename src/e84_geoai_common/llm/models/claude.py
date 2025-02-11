@@ -266,13 +266,3 @@ class BedrockClaudeLLM(LLM):
         return ClaudeResponse.model_validate_json(response_body)
 
     # FUTURE implement tool use
-
-
-#########################
-# Code for manual testing
-# ruff: noqa: ERA001
-
-# llm = BedrockClaudeLLM()
-# config = LLMInferenceConfig(json_mode=True)
-# resp = llm.prompt([LLMMessage(content="Create a list of the numbers 1 through 5")], config)
-# resp

@@ -99,10 +99,6 @@ class LLMInferenceConfig(BaseModel):
         default=False,
         description="If True, forces model to only outputs valid JSON.",
     )
-    response_prefix: str | None = Field(
-        default=None,
-        description="Continue a pre-filled response instead of starting from scratch.",
-    )
 
 
 class LLM(ABC):

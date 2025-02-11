@@ -39,7 +39,7 @@ def test_extract():
         ]
     )
 
-    # Drop the opening { as claude will return it.
+    # Drop the opening { matching claude response.
     mock_resp_json = expected_result.model_dump_json()[1:]
     client = MockBedrockRuntimeClient([claude_response_with_content(mock_resp_json)])
     llm = BedrockClaudeLLM(client=client)

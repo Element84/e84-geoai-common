@@ -43,7 +43,6 @@ dev = [
   "build>=1.2.2",
   "pre-commit>=3.8.0",
   "pre-commit-hooks>=4.6.0",
-  "moto>=5.0.20",
 ]
 
 
@@ -80,6 +79,10 @@ ignore = [
   'COM812',
   # Missing docstring for module
   'D100',
+  # Docstring in public class
+  'D101',
+  # Documentation in public method
+  'D102',
   # Missing docstring in magic method
   'D105',
   # 1 blank line required before class docstring
