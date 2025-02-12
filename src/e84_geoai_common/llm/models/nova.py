@@ -220,7 +220,7 @@ class BedrockNovaLLM(LLM):
             raise ValueError(msg)
         request = self._create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        return response.output.message.to_llm_message(json_mode=config.json_mode)
+        return response.output.message.to_llm_message(json_mode=inference_cfg.json_mode)
 
     @timed_function
     def invoke_model_with_request(self, request: NovaInvokeLLMRequest) -> NovaResponse:

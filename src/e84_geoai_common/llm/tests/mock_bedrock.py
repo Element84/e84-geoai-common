@@ -30,6 +30,21 @@ def claude_response_with_content(text: str) -> dict[str, Any]:
     }
 
 
+def nova_response_with_content(text: str) -> dict[str, Any]:
+    """Creates a mock claude response with the given text."""
+    return {
+        "output": {"message": {"role": "assistant", "content": [{"text": text}]}},
+        "stopReason": "end_turn",
+        "usage": {
+            "inputTokens": 123,
+            "outputTokens": 123,
+            "totalTokens": 123,
+            "cacheReadInputTokenCount": 123,
+            "cacheWriteInputTokenCount": 123,
+        },
+    }
+
+
 class MockBedrockRuntimeClient(BedrockRuntimeClient):
     """Implements the bedrock runtime client to return a set of canned responses."""
 
