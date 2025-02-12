@@ -7,7 +7,7 @@
 set -e -o pipefail
 
 echo "Running Ruff"
-ruff check src/ --diff
+ruff check src/ tests/ --diff
 
 echo "Running pyright"
 pyright .

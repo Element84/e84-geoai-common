@@ -190,6 +190,14 @@ class ClaudeResponse(BaseModel):
     usage: ClaudeUsageInfo
 
 
+def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
+    if config.json_mode:
+        return "{"
+    if config.response_prefix:
+        return config.response_prefix
+    return None
+
+
 class BedrockClaudeLLM(LLM):
     """Implements the LLM class for Bedrock Claude."""
 
@@ -212,8 +220,9 @@ class BedrockClaudeLLM(LLM):
     def _create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ClaudeInvokeLLMRequest:
-        if config.json_mode:
-            messages = [*messages, LLMMessage(role="assistant", content="{")]
+        response_prefix = _config_to_response_prefix(config)
+        if response_prefix:
+            messages = [*messages, LLMMessage(role="assistant", content=response_prefix)]
 
         return ClaudeInvokeLLMRequest(
             max_tokens=config.max_tokens,
@@ -242,8 +251,10 @@ class BedrockClaudeLLM(LLM):
             if isinstance(c, ClaudeToolUseResponse):
                 raise TypeError("Did not expect a tool use response")
             text = c.text
-            if index == 0 and inference_cfg.json_mode:
-                text = "{" + text
+
+            response_prefix = _config_to_response_prefix(inference_cfg)
+            if index == 0 and response_prefix:
+                text = response_prefix + text
 
             return TextContent(text=text)
 

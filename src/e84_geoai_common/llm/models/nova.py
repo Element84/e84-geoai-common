@@ -85,25 +85,28 @@ class NovaMessage(BaseModel):
             content = [_handle_content(subcontent) for subcontent in msg.content]
         return cls(role=msg.role, content=content)
 
-    def to_llm_message(self, *, json_mode: bool = False) -> LLMMessage:
+    def to_llm_message(self, inference_cfg: LLMInferenceConfig) -> LLMMessage:
         def _to_llm_content(
+            index: int,
             c: NovaTextContent | NovaImageContent,
         ) -> TextContent | Base64ImageContent:
             if isinstance(c, NovaTextContent):
                 content = c.text
-                if json_mode:
-                    # In JSON mode we need to remove the JSON stop sequence
-                    content = content.removesuffix("```")
+                if index == 0 and inference_cfg.response_prefix:
+                    content = inference_cfg.response_prefix + content
                 return TextContent(text=content)
+
             return c.to_b64_image_content()
 
-        if len(self.content) == 1 and isinstance(self.content, TextContent):
-            content = self.content.text
-            if json_mode:
+        if len(self.content) == 1 and isinstance(self.content[0], NovaTextContent):
+            content = self.content[0].text
+            if inference_cfg.json_mode:
                 # In JSON mode we need to remove the JSON stop sequence
                 content = content.removesuffix("```")
+            elif inference_cfg.response_prefix:
+                content = inference_cfg.response_prefix + content
         else:
-            content = [_to_llm_content(c) for c in self.content]
+            content = [_to_llm_content(index, c) for index, c in enumerate(self.content)]
 
         return LLMMessage(role=self.role, content=content)
 
@@ -196,6 +199,8 @@ class BedrockNovaLLM(LLM):
             prefix = "```json"
             messages = [*messages, LLMMessage(role="assistant", content=prefix)]
             stop_sequences = ["```"]
+        elif config.response_prefix:
+            messages = [*messages, LLMMessage(role="assistant", content=config.response_prefix)]
         return NovaInvokeLLMRequest(
             system=system,
             inference_config=NovaInferenceConfig(
@@ -220,7 +225,7 @@ class BedrockNovaLLM(LLM):
             raise ValueError(msg)
         request = self._create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        return response.output.message.to_llm_message(json_mode=inference_cfg.json_mode)
+        return response.output.message.to_llm_message(inference_cfg)
 
     @timed_function
     def invoke_model_with_request(self, request: NovaInvokeLLMRequest) -> NovaResponse:

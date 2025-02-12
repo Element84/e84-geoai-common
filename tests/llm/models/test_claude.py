@@ -20,6 +20,15 @@ def test_basic_usage() -> None:
     assert resp == expected_resp
 
 
+def test_with_response_prefix() -> None:
+    llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("  15")]))
+    config = LLMInferenceConfig(response_prefix="5 + 10 =")
+    resp = llm.prompt(
+        [LLMMessage(content="Output the sum of 5 and 10 without additional explanation")], config
+    )
+    assert resp == LLMMessage(role="assistant", content=[TextContent(text="5 + 10 =  15")])
+
+
 def test_json_mode() -> None:
     json_mode_prompt = """
         Create a list of the numbers 1 through 5.
