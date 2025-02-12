@@ -5,8 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from e84_geoai_common.llm.extraction import extract_data_from_text
 from e84_geoai_common.llm.models.claude import BedrockClaudeLLM
 from e84_geoai_common.llm.tests.mock_bedrock import (
-    MockBedrockRuntimeClient,
     claude_response_with_content,
+    make_test_bedrock_client,
 )
 
 
@@ -41,7 +41,7 @@ def test_extract():
 
     # Drop the opening { matching claude response.
     mock_resp_json = expected_result.model_dump_json()[1:]
-    client = MockBedrockRuntimeClient([claude_response_with_content(mock_resp_json)])
+    client = make_test_bedrock_client([claude_response_with_content(mock_resp_json)])
     llm = BedrockClaudeLLM(client=client)
     result = extract_data_from_text(
         llm=llm,

@@ -5,13 +5,13 @@ from e84_geoai_common.llm.models.claude import (
     BedrockClaudeLLM,
 )
 from e84_geoai_common.llm.tests.mock_bedrock import (
-    MockBedrockRuntimeClient,
     claude_response_with_content,
+    make_test_bedrock_client,
 )
 
 
 def test_basic_usage() -> None:
-    llm = BedrockClaudeLLM(client=MockBedrockRuntimeClient([claude_response_with_content("olleh")]))
+    llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("olleh")]))
     config = LLMInferenceConfig()
     resp = llm.prompt(
         [LLMMessage(content="Output the word hello backwards and only that.")], config
@@ -28,7 +28,7 @@ def test_json_mode() -> None:
         {"result": [2, 3, 4, 5, 6]}
     """
     llm = BedrockClaudeLLM(
-        client=MockBedrockRuntimeClient(
+        client=make_test_bedrock_client(
             [claude_response_with_content('"result": [1, 2, 3, 4, 5]}')]
         )
     )
