@@ -96,7 +96,7 @@ class ClaudeToolChoice(BaseModel):
     name: str | None = None
     # disable_parallel_tool_use is documented in Anthropic docs but seems to
     # not be supported in Bedrock
-    # disable_parallel_tool_use: bool | None = None
+    # disable_parallel_tool_use: bool | None = None # noqa: ERA001
 
 
 class ClaudeTool(BaseModel):
