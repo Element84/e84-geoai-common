@@ -280,6 +280,8 @@ class BedrockClaudeLLM(LLM):
             log.exception("Request body: %s", request.model_dump_json())
             raise
         response_body = response["body"].read().decode("UTF-8")
-        return ClaudeResponse.model_validate_json(response_body)
+        claude_response = ClaudeResponse.model_validate_json(response_body)
+        log.info("Token usage: %s", claude_response.usage)
+        return claude_response
 
     # FUTURE implement tool use

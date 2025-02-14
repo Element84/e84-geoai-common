@@ -254,7 +254,9 @@ class BedrockNovaLLM(LLM):
             log.exception("Request body: %s", request.model_dump_json())
             raise
         response_body = response["body"].read().decode("UTF-8")
-        return NovaResponse.model_validate_json(response_body)
+        nova_response = NovaResponse.model_validate_json(response_body)
+        log.info("Token usage: %s", nova_response.usage)
+        return nova_response
 
 
 #########################
