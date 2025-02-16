@@ -166,7 +166,7 @@ class NovaResponse(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
     output: NovaResponseOutput
-    stop_reason: Literal["end_turn"] = Field(alias="stopReason")
+    stop_reason: Literal["end_turn", "max_tokens"] = Field(alias="stopReason")
     usage: NovaUsageInfo
 
 
