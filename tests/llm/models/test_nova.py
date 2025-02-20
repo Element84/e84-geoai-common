@@ -1,5 +1,4 @@
 import base64
-import json
 from pathlib import Path
 
 from e84_geoai_common.llm.core.llm import (
@@ -8,54 +7,41 @@ from e84_geoai_common.llm.core.llm import (
     LLMMessage,
     TextContent,
 )
-from e84_geoai_common.llm.models.claude import (
-    BedrockClaudeLLM,
-)
+from e84_geoai_common.llm.models.nova import BedrockNovaLLM
 from e84_geoai_common.llm.tests.mock_bedrock import (
-    claude_response_with_content,
     make_test_bedrock_client,
+    nova_response_with_content,
 )
 
 
 def test_basic_usage() -> None:
-    llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("olleh")]))
+    llm = BedrockNovaLLM(client=make_test_bedrock_client([nova_response_with_content("olleh")]))
     config = LLMInferenceConfig()
     resp = llm.prompt(
         [LLMMessage(content="Output the word hello backwards and only that.")], config
     )
-    expected_resp = LLMMessage(role="assistant", content=[TextContent(text="olleh")])
-    assert resp == expected_resp
+    assert resp == LLMMessage(role="assistant", content="olleh")
 
 
 def test_with_response_prefix() -> None:
-    llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("  15")]))
-    config = LLMInferenceConfig(response_prefix="5 + 10 =")
+    llm = BedrockNovaLLM(client=make_test_bedrock_client([nova_response_with_content("15")]))
+    config = LLMInferenceConfig(response_prefix="5 + 10 = ")
     resp = llm.prompt(
         [LLMMessage(content="Output the sum of 5 and 10 without additional explanation")], config
     )
-    assert resp == LLMMessage(role="assistant", content=[TextContent(text="5 + 10 =  15")])
+    assert resp == LLMMessage(role="assistant", content="5 + 10 = 15")
 
 
 def test_json_mode() -> None:
     json_mode_prompt = """
         Create a list of the numbers 1 through 5.
-
-        Here's an example of the desired output for the number 2 through 6
-        {"result": [2, 3, 4, 5, 6]}
     """
-    llm = BedrockClaudeLLM(
-        client=make_test_bedrock_client(
-            [claude_response_with_content('"result": [1, 2, 3, 4, 5]}')]
-        )
+    llm = BedrockNovaLLM(
+        client=make_test_bedrock_client([nova_response_with_content("[1, 2, 3, 4, 5]\n```")])
     )
     config = LLMInferenceConfig(json_mode=True)
     resp = llm.prompt([LLMMessage(content=json_mode_prompt)], config)
-
-    assert resp.role == "assistant"
-    assert len(resp.content) == 1
-    content = resp.content[0]
-    assert isinstance(content, TextContent)
-    assert json.loads(content.text) == {"result": [1, 2, 3, 4, 5]}
+    assert resp == LLMMessage(role="assistant", content="[1, 2, 3, 4, 5]\n")
 
 def encode_image_to_base64(image_path: str) -> str:
     image = Path(image_path)
@@ -66,9 +52,9 @@ def encode_image_to_base64(image_path: str) -> str:
 def test_image_input() -> None:
     # Simulated response when processing an image
     expected_text_output = "cat"
-    mock_response = claude_response_with_content(expected_text_output)
+    mock_response = nova_response_with_content(expected_text_output)
 
-    llm = BedrockClaudeLLM(client=make_test_bedrock_client([mock_response]))
+    llm = BedrockNovaLLM(client=make_test_bedrock_client([mock_response]))
 
     #locally ai generated picture of a cat
     image_path = str(Path(__file__).parent / "images/cat.webp")
@@ -77,7 +63,10 @@ def test_image_input() -> None:
     # Mock image content
     image_content = Base64ImageContent(media_type="image/webp", data=base64_string)
     prompt_text = TextContent(
-        text="Report the animal in the picture and only that, in lowercase. I.e. dog"
+        text="""
+        Report the animal in the picture and only that, in lowercase.
+        I.e. dog. Respond with ONLY one word, the animal in the picture.
+    """
     )
 
     prompt_message = LLMMessage(
@@ -89,4 +78,4 @@ def test_image_input() -> None:
 
     resp = llm.prompt([prompt_message], config)
 
-    assert resp == LLMMessage(role="assistant", content=[TextContent(text="cat")])
+    assert resp == LLMMessage(role="assistant", content="cat")
