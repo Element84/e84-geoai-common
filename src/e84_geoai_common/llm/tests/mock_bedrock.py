@@ -18,7 +18,6 @@ from mypy_boto3_bedrock_runtime.type_defs import (
 USE_REAL_BEDROCK_CLIENT = os.getenv("USE_REAL_BEDROCK_CLIENT") == "true"
 
 
-
 def _string_to_streaming_body(string_data: str) -> StreamingBody:
     bytes_data = string_data.encode("utf-8")
     stream = BytesIO(bytes_data)

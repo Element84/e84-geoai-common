@@ -22,11 +22,11 @@ log = logging.getLogger(__name__)
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 NOVA_BEDROCK_MODEL_IDS = {
-    "Nova Canvas": "us.amazon.nova-canvas-v1:0",
-    "Nova Lite": "us.amazon.nova-lite-v1:0",
-    "Nova Micro": "us.amazon.nova-micro-v1:0",
-    "Nova Pro": "us.amazon.nova-pro-v1:0",
-    "Nova Reel": "us.amazon.nova-reel-v1:0",
+    "Nova Canvas": "amazon.nova-canvas-v1:0",
+    "Nova Lite": "amazon.nova-lite-v1:0",
+    "Nova Micro": "amazon.nova-micro-v1:0",
+    "Nova Pro": "amazon.nova-pro-v1:0",
+    "Nova Reel": "amazon.nova-reel-v1:0",
 }
 
 
@@ -237,8 +237,6 @@ class BedrockNovaLLM(LLM):
             raise ValueError(msg)
         request = self._create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        # log.info(response.output)
-        log.info(response)
         return response.output.message.to_llm_message(inference_cfg)
 
     @timed_function
@@ -265,13 +263,7 @@ class BedrockNovaLLM(LLM):
 
 # llm = BedrockNovaLLM()
 # config = LLMInferenceConfig()
-# resp = llm.prompt(
-#     messages=[
-#         LLMMessage(content="repeat 'hello' backwards"),
-#         LLMMessage(role="assistant", content="what is 10+10?")
-#     ],
-#     inference_cfg=config
-# )
+# resp = llm.prompt(messages=[LLMMessage(content="hello")], inference_cfg=config)
 # print(resp.model_dump_json(indent=2))
 
 
