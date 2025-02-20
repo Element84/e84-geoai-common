@@ -64,7 +64,6 @@ def encode_image_to_base64(image_path: str) -> str:
     return encoded_bytes.decode("utf-8")
 
 def test_image_input() -> None:
-    # Simulated response when processing an image
     expected_text_output = "cat"
     mock_response = claude_response_with_content(expected_text_output)
 
@@ -74,7 +73,6 @@ def test_image_input() -> None:
     image_path = str(Path(__file__).parent / "images/cat.webp")
     base64_string = encode_image_to_base64(image_path)
 
-    # Mock image content
     image_content = Base64ImageContent(media_type="image/webp", data=base64_string)
     prompt_text = TextContent(
         text="Report the animal in the picture and only that, in lowercase. I.e. dog"

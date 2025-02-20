@@ -33,11 +33,9 @@ CONVERSE_BEDROCK_MODEL_IDS = {
     "Claude Instant": "anthropic.claude-instant-v1",
     "Claude 3.5 Haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
     "Claude 3.5 Sonnet v2": "anthropic.claude-3-5-sonnet-20241022-v2:0",
-    # "Nova Canvas": "amazon.nova-canvas-v1:0",
-    "Nova Lite": "us.amazon.nova-lite-v1:0", #added 'us' infront for invocation
+    "Nova Lite": "us.amazon.nova-lite-v1:0",
     "Nova Micro": "us.amazon.nova-micro-v1:0",
     "Nova Pro": "us.amazon.nova-pro-v1:0",
-    # "Nova Reel": "amazon.nova-reel-v1:0",
     "Llama 3.1 70B Instruct": "us.meta.llama3-1-70b-instruct-v1:0",
     "Llama 3.1 8B Instruct": "us.meta.llama3-1-8b-instruct-v1:0",
     "Llama 3.2 11B Vision Instruct": "us.meta.llama3-2-11b-instruct-v1:0",
