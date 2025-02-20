@@ -48,6 +48,10 @@ CONVERSE_BEDROCK_MODEL_IDS = {
 }
 
 
+#################################################################################
+# Messages Object Components
+
+
 class ConverseTextContent(BaseModel):
     """Converse text context model."""
 
@@ -93,6 +97,7 @@ class ConverseToolResultContent(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     toolResult: ConverseToolResultInnerContent # noqa: N815
+
 
 class ConverseImageSource(BaseModel):
 
@@ -230,43 +235,8 @@ class ConverseAssistantMessage(ConverseMessage):
     content: list[ConverseTextContent | ConverseToolUseContent]
 
 
-class ConverseUsageInfo(BaseModel):
-    """Usage info from the Converse API."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    inputTokens: int # noqa: N815
-    outputTokens: int # noqa: N815
-    totalTokens: int # noqa: N815
-
-class ConverseMessageResponse(BaseModel):
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    message: ConverseAssistantMessage
-
-class ConverseMetrics(BaseModel):
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    latencyMs: int  # noqa: N815
-
-class ConverseResponse(BaseModel):
-    """Converse response model."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    additionalModelResponseFields: dict[str, Any] | None = Field(default = None)  # noqa: N815
-    metrics: ConverseMetrics
-    output: ConverseMessageResponse
-    performanceConfig: dict[str, Any] | None = Field(default = None)  # noqa: N815
-    ResponseMetadata: dict[str, Any]
-    role: Literal["assistant"] = "assistant"
-    stopReason: Literal[  # noqa: N815
-        "end_turn", "max_tokens", "stop_sequence", "tool_use"
-    ]
-    trace: dict[str, Any] | None = Field(default = None)
-    usage: ConverseUsageInfo
+#################################################################################
+# Other Request Objects
 
 
 class ConverseToolSpec(BaseModel):
@@ -338,12 +308,14 @@ class ConverseToolChoice(BaseModel):
     # not be supported in Bedrock
     # disable_parallel_tool_use: bool | None = None  # noqa: ERA001
 
+
 class SystemContentBlock(BaseModel):
     """A system prompt block."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
     text: str
+
 
 class ConverseInferenceConfig(BaseModel):
     """Converse inference config model."""
@@ -354,6 +326,7 @@ class ConverseInferenceConfig(BaseModel):
     stopSequences: Sequence[str] | None  # noqa: N815
     temperature: float | None
     topP: float | None  # noqa: N815
+
 
 class ConverseAdditionalModelRequestFields(BaseModel):
     """Converse additional fields for certain models."""
@@ -378,7 +351,7 @@ class ConverseInvokeLLMRequest(BaseModel):
 
     modelId: str = Field( # noqa: N815
         default=CONVERSE_BEDROCK_MODEL_IDS["Claude 3 Haiku"],
-        description="model used for the Converse api"
+        description="Model used for the Converse api"
     )
 
     messages: list[ConverseMessage] = Field(
@@ -391,6 +364,46 @@ class ConverseInvokeLLMRequest(BaseModel):
         default=None, description="List of tools that the model may call."
     )
 
+#################################################################################
+# Response objects
+
+class ConverseUsageInfo(BaseModel):
+    """Usage info from the Converse API."""
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    inputTokens: int # noqa: N815
+    outputTokens: int # noqa: N815
+    totalTokens: int # noqa: N815
+
+class ConverseMessageResponse(BaseModel):
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    message: ConverseAssistantMessage
+
+class ConverseMetrics(BaseModel):
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    latencyMs: int  # noqa: N815
+
+class ConverseResponse(BaseModel):
+    """Converse response model."""
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    additionalModelResponseFields: dict[str, Any] | None = Field(default = None)  # noqa: N815
+    metrics: ConverseMetrics
+    output: ConverseMessageResponse
+    performanceConfig: dict[str, Any] | None = Field(default = None)  # noqa: N815
+    ResponseMetadata: dict[str, Any]
+    role: Literal["assistant"] = "assistant"
+    stopReason: Literal[  # noqa: N815
+        "end_turn", "max_tokens", "stop_sequence", "tool_use"
+    ]
+    trace: dict[str, Any] | None = Field(default = None)
+    usage: ConverseUsageInfo
 
 def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
     if config.json_mode:

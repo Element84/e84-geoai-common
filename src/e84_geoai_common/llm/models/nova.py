@@ -22,11 +22,11 @@ log = logging.getLogger(__name__)
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 NOVA_BEDROCK_MODEL_IDS = {
-    "Nova Canvas": "amazon.nova-canvas-v1:0",
-    "Nova Lite": "amazon.nova-lite-v1:0",
-    "Nova Micro": "amazon.nova-micro-v1:0",
-    "Nova Pro": "amazon.nova-pro-v1:0",
-    "Nova Reel": "amazon.nova-reel-v1:0",
+    "Nova Canvas": "us.amazon.nova-canvas-v1:0",
+    "Nova Lite": "us.amazon.nova-lite-v1:0",
+    "Nova Micro": "us.amazon.nova-micro-v1:0",
+    "Nova Pro": "us.amazon.nova-pro-v1:0",
+    "Nova Reel": "us.amazon.nova-reel-v1:0",
 }
 
 
