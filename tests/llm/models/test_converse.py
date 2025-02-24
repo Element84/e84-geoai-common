@@ -1,3 +1,4 @@
+import base64
 import json
 from pathlib import Path
 
@@ -57,21 +58,21 @@ def test_json_mode() -> None:
     assert json.loads(content.text) == {"result": [1, 2, 3, 4, 5]}
 
 #Unlike other SDK APIs, Converse API doesn't support base64 encoding of images
-def encode_image_to_bytes(image_path: str) -> bytes:
+def encode_image_to_base64_str(image_path: str) -> str:
     image = Path(image_path)
     with image.open("rb") as image_file:
-        base64_encoded = image_file.read()
-    return base64_encoded
+        encoded_bytes = base64.b64encode(image_file.read())
+    return encoded_bytes.decode("utf-8")
 
 def test_image_input() -> None:
-    expected_text_output = "cat"
-    mock_response = converse_response_with_content(expected_text_output)
 
-    llm = BedrockConverseLLM(client=make_test_bedrock_client([mock_response]))
+    llm = BedrockConverseLLM(client=make_test_bedrock_client([
+        converse_response_with_content("cat")
+    ]))
 
     #locally ai generated picture of a cat
     image_path = str(Path(__file__).parent / "images/cat.webp")
-    base64_string = encode_image_to_bytes(image_path)
+    base64_string = encode_image_to_base64_str(image_path)
 
     image_content = Base64ImageContent(media_type="image/webp", data=base64_string)
     prompt_text = TextContent(
@@ -91,37 +92,3 @@ def test_image_input() -> None:
     resp = llm.prompt([prompt_message], config)
 
     assert resp == LLMMessage(role="assistant", content=[TextContent(text="cat")])
-
-#tool used in testing tool usage
-def output__string(first_word: str, second_word: str) -> str:
-    """Outputs a string, given two words."""
-    return first_word + " " + second_word + " element eightyfour"
-
-def test_tool_usage() -> None:
-    llm = BedrockConverseLLM(
-        client=make_test_bedrock_client([
-            converse_response_with_content("result: element 84 element eightyfour")
-        ])
-    )
-
-    prompt_message = LLMMessage(
-        role="user",
-        content="""use your tool and respond with: "result: output"
-        Input two words, "element" and "84".""",
-    )
-
-    config = LLMInferenceConfig(
-        system_prompt=(
-            "You can use tools. "
-        ),
-        tools=[output__string],
-    )
-
-    resp = llm.prompt([prompt_message], config)
-
-    expected_resp = LLMMessage(
-        role="assistant",
-        content=[TextContent(text="result: element 84 element eightyfour")],
-    )
-
-    assert resp == expected_resp

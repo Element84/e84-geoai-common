@@ -13,8 +13,6 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMessage,
     TextContent,
-    ToolResultContent,
-    ToolUseContent,
 )
 from e84_geoai_common.util import timed_function
 
@@ -25,13 +23,13 @@ ANTHROPIC_API_VERSION = "bedrock-2023-05-31"
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 CLAUDE_BEDROCK_MODEL_IDS = {
-    "Claude 3 Haiku": "anthropic.claude-3-haiku-20240307-v1:0",
-    "Claude 3.5 Sonnet": "anthropic.claude-3-5-sonnet-20240620-v1:0",
-    "Claude 3 Sonnet": "anthropic.claude-3-sonnet-20240229-v1:0",
-    "Claude 3 Opus": "anthropic.claude-3-opus-20240229-v1:0",
-    "Claude Instant": "anthropic.claude-instant-v1",
-    "Claude 3.5 Haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
-    "Claude 3.5 Sonnet v2": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "Claude 3 Haiku": "us.anthropic.claude-3-haiku-20240307-v1:0",
+    "Claude 3.5 Sonnet": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "Claude 3 Sonnet": "us.anthropic.claude-3-sonnet-20240229-v1:0",
+    "Claude 3 Opus": "us.anthropic.claude-3-opus-20240229-v1:0",
+    "Claude Instant": "us.anthropic.claude-instant-v1",
+    "Claude 3.5 Haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
 }
 
 
@@ -76,17 +74,13 @@ class ClaudeMessage(BaseModel):
         """Converts the generic LLM Message into a ClaudeMessage."""
 
         def _handle_content(
-            subcontent: TextContent | Base64ImageContent | ToolUseContent | ToolResultContent,
+            subcontent: TextContent | Base64ImageContent,
         ) -> ClaudeTextContent | ClaudeImageContent:
             if isinstance(subcontent, TextContent):
                 return ClaudeTextContent(text=subcontent.text)
-            if isinstance(subcontent, Base64ImageContent):
-                if not isinstance(subcontent.data, str):
-                    raise TypeError("Use base64 for Claude image data")
-                return ClaudeImageContent(
-                    source=ClaudeImageSource(media_type=subcontent.media_type, data=subcontent.data)
-                )
-            raise NotImplementedError("ToolUseContent and ToolResultContent are not supported yet.")
+            return ClaudeImageContent(
+                source=ClaudeImageSource(media_type=subcontent.media_type, data=subcontent.data)
+            )
 
         if isinstance(msg.content, str):
             content = msg.content

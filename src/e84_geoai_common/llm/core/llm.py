@@ -22,21 +22,7 @@ class Base64ImageContent(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
-    data: str | bytes
-
-
-
-class ToolResultContent(BaseModel):
-    """Converse tool result modoel."""
-    tool_use_id: str
-    content: list[dict[str, Any]]
-
-
-class ToolUseContent(BaseModel):
-    """Converse tool-use request model."""
-    tool_use_id: str
-    name: str
-    input: dict[str, Any]
+    data: str
 
 class LLMMessage(BaseModel):
     """Standard representation of an LLM message.
@@ -48,7 +34,7 @@ class LLMMessage(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     role: Literal["assistant", "user"] = "user"
-    content: str | Sequence[TextContent | Base64ImageContent | ToolUseContent | ToolResultContent]
+    content: str | Sequence[TextContent | Base64ImageContent]
 
     def to_text_only(self) -> str:
         """Returns the message as text.

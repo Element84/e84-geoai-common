@@ -43,21 +43,19 @@ def test_json_mode() -> None:
     resp = llm.prompt([LLMMessage(content=json_mode_prompt)], config)
     assert resp == LLMMessage(role="assistant", content="[1, 2, 3, 4, 5]\n")
 
-def encode_image_to_base64(image_path: str) -> str:
+def encode_image_to_base64_str(image_path: str) -> str:
     image = Path(image_path)
     with image.open("rb") as image_file:
         encoded_bytes = base64.b64encode(image_file.read())
     return encoded_bytes.decode("utf-8")
 
 def test_image_input() -> None:
-    expected_text_output = "cat"
-    mock_response = nova_response_with_content(expected_text_output)
 
-    llm = BedrockNovaLLM(client=make_test_bedrock_client([mock_response]))
+    llm = BedrockNovaLLM(client=make_test_bedrock_client([nova_response_with_content("cat")]))
 
     #locally ai generated picture of a cat
     image_path = str(Path(__file__).parent / "images/cat.webp")
-    base64_string = encode_image_to_base64(image_path)
+    base64_string = encode_image_to_base64_str(image_path)
 
     image_content = Base64ImageContent(media_type="image/webp", data=base64_string)
     prompt_text = TextContent(

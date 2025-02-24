@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Sequence
-from typing import Literal, Self
+from typing import Literal, Self, cast
 
 import boto3
 import botocore.exceptions
@@ -13,8 +13,6 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMessage,
     TextContent,
-    ToolResultContent,
-    ToolUseContent,
 )
 from e84_geoai_common.util import timed_function
 
@@ -40,7 +38,7 @@ class NovaTextContent(BaseModel):
 
 class NovaImageSource(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    bytes: str | bytes
+    bytes: str
 
 
 class NovaImageInnerContent(BaseModel):
@@ -56,17 +54,23 @@ class NovaImageContent(BaseModel):
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
-        img_format = image.media_type.split("/")[-1]
+        img_format: Literal["jpeg", "png", "gif", "webp"] = cast(
+        Literal["jpeg", "png", "gif", "webp"], image.media_type.split("/")[-1]
+    )
         return cls(
             image = NovaImageInnerContent(
-                format=img_format,  # type: ignore[reportArgumentType]
+                format=img_format,
                 source=NovaImageSource(bytes=image.data),
             )
         )
 
     def to_b64_image_content(self) -> Base64ImageContent:
+        media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"] = cast(
+            Literal["image/jpeg", "image/png", "image/gif", "image/webp"],
+            f"image/{self.image.format}"
+        )
         return Base64ImageContent(
-            format=f"image/{self.format}",  # type: ignore[reportArgumentType]
+            media_type=media_type,
             data=self.image.source.bytes,
         )
 
@@ -81,15 +85,11 @@ class NovaMessage(BaseModel):
     @classmethod
     def from_llm_message(cls, msg: LLMMessage) -> Self:
         def _handle_content(
-            subcontent: TextContent | Base64ImageContent | ToolUseContent | ToolResultContent,
+            subcontent: TextContent | Base64ImageContent,
         ) -> NovaTextContent | NovaImageContent:
             if isinstance(subcontent, TextContent):
                 return NovaTextContent(text=subcontent.text)
-            if isinstance(subcontent, Base64ImageContent):
-                if not isinstance(subcontent.data, str):
-                    raise TypeError("Use base64 for Nova image data")
-                return NovaImageContent.from_b64_image_content(subcontent)
-            raise NotImplementedError("ToolUseContent and ToolResultContent are not supported yet.")
+            return NovaImageContent.from_b64_image_content(subcontent)
 
         if isinstance(msg.content, str):
             content = [NovaTextContent(text=msg.content)]

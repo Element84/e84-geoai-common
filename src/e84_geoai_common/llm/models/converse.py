@@ -1,13 +1,11 @@
+import base64
 import json
 import logging
-from collections.abc import Callable, Sequence
-from typing import Any, Literal, Self
+from collections.abc import Sequence
+from typing import Any, Literal, Self, cast
 
 import boto3
 import botocore.exceptions
-from function_schema.core import (  # type: ignore[reportMissingTypeStubs]
-    get_function_schema,  # type: ignore[reportUnknownVariableType]
-)
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,22 +15,23 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMessage,
     TextContent,
-    ToolResultContent,
-    ToolUseContent,
 )
 from e84_geoai_common.util import timed_function
+
+# Converse uses camel case for its variables. Ignore any linting problems with this.
+# ruff: noqa: N815
 
 log = logging.getLogger(__name__)
 
 
 CONVERSE_BEDROCK_MODEL_IDS = {
-    "Claude 3 Haiku": "anthropic.claude-3-haiku-20240307-v1:0",
-    "Claude 3.5 Sonnet": "anthropic.claude-3-5-sonnet-20240620-v1:0",
-    "Claude 3 Sonnet": "anthropic.claude-3-sonnet-20240229-v1:0",
-    "Claude 3 Opus": "anthropic.claude-3-opus-20240229-v1:0",
-    "Claude Instant": "anthropic.claude-instant-v1",
-    "Claude 3.5 Haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
-    "Claude 3.5 Sonnet v2": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "Claude 3 Haiku": "us.anthropic.claude-3-haiku-20240307-v1:0",
+    "Claude 3.5 Sonnet": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "Claude 3 Sonnet": "us.anthropic.claude-3-sonnet-20240229-v1:0",
+    "Claude 3 Opus": "us.anthropic.claude-3-opus-20240229-v1:0",
+    "Claude Instant": "us.anthropic.claude-instant-v1",
+    "Claude 3.5 Haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
     "Nova Lite": "us.amazon.nova-lite-v1:0",
     "Nova Micro": "us.amazon.nova-micro-v1:0",
     "Nova Pro": "us.amazon.nova-pro-v1:0",
@@ -66,7 +65,7 @@ class ConverseToolUseInnerContent(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    toolUseId: str  # noqa: N815
+    toolUseId: str
     name: str
     input: dict[str, Any]
 
@@ -76,7 +75,7 @@ class ConverseToolUseContent(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    toolUse: ConverseToolUseInnerContent # noqa: N815
+    toolUse: ConverseToolUseInnerContent
 
 
 class ConverseToolResultInnerContent(BaseModel):
@@ -84,7 +83,7 @@ class ConverseToolResultInnerContent(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    toolUseId: str # noqa: N815
+    toolUseId: str
     content: list[dict[str, Any]]
     status: str | None = None
 
@@ -94,13 +93,13 @@ class ConverseToolResultContent(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    toolResult: ConverseToolResultInnerContent # noqa: N815
+    toolResult: ConverseToolResultInnerContent
 
 
 class ConverseImageSource(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
-    bytes: str | bytes
+    bytes: bytes
 
 
 class ConverseImage(BaseModel):
@@ -117,19 +116,25 @@ class ConverseImageContent(BaseModel):
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
-        img_format = image.media_type.split("/")[-1]
-        source=ConverseImageSource(bytes=image.data)
+        img_format: Literal["jpeg", "png", "gif", "webp"] = cast(
+        Literal["jpeg", "png", "gif", "webp"], image.media_type.split("/")[-1]
+    )
+        source=ConverseImageSource(bytes=base64.b64decode(image.data))
         return cls(
             image = ConverseImage(
-                format=img_format, # type: ignore[reportArgumentType]
+                format=img_format,
                 source=source
             )
         )
 
     def to_b64_image_content(self) -> Base64ImageContent:
+        media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"] = cast(
+            Literal["image/jpeg", "image/png", "image/gif", "image/webp"],
+            f"image/{self.image.format}"
+        )
         return Base64ImageContent(
-            format=f"image/{self.format}",  # type: ignore[reportArgumentType]
-            data=self.image.source.bytes,
+            media_type=media_type,
+            data=self.image.source.bytes.decode("utf8"),
         )
 
 
@@ -140,36 +145,18 @@ class ConverseMessage(BaseModel):
 
     role: Literal["assistant", "user"]
     content: Sequence[
-            ConverseTextContent | ConverseImageContent |
-            ConverseToolUseContent | ConverseToolResultContent
+            ConverseTextContent | ConverseImageContent
         ]
 
 
     @classmethod
     def from_llm_message(cls, msg: LLMMessage) -> Self:
         def _handle_content(
-            subcontent: TextContent | Base64ImageContent | ToolResultContent | ToolUseContent,
-        ) -> ConverseTextContent | ConverseImageContent | ConverseToolResultContent | ConverseToolUseContent:  # noqa: E501
+            subcontent: TextContent | Base64ImageContent,
+        ) -> ConverseTextContent | ConverseImageContent:
             if isinstance(subcontent, TextContent):
                 return ConverseTextContent(text=subcontent.text)
-            if isinstance(subcontent, Base64ImageContent):
-                if not isinstance(subcontent.data, bytes):
-                    raise TypeError("Use bytes for Converse image data")
-                return ConverseImageContent.from_b64_image_content(subcontent)
-            if isinstance(subcontent, ToolResultContent):
-                return ConverseToolResultContent(
-                    toolResult = ConverseToolResultInnerContent (
-                        toolUseId=subcontent.tool_use_id,
-                        content = subcontent.content
-                    )
-                )
-            return ConverseToolUseContent(
-                toolUse = ConverseToolUseInnerContent(
-                    toolUseId = subcontent.tool_use_id,
-                    name = subcontent.name,
-                    input = subcontent.input
-                )
-            )
+            return ConverseImageContent.from_b64_image_content(subcontent)
 
         if isinstance(msg.content, str):
             content = [ConverseTextContent(text=msg.content)]
@@ -180,26 +167,14 @@ class ConverseMessage(BaseModel):
     def to_llm_message(self, inference_cfg: LLMInferenceConfig) -> LLMMessage:
         def _to_llm_content(
             index: int,
-            c: ConverseTextContent | ConverseImageContent |
-               ConverseToolResultContent | ConverseToolUseContent,
-        ) -> TextContent | Base64ImageContent | ToolResultContent | ToolUseContent:
+            c: ConverseTextContent | ConverseImageContent,
+        ) -> TextContent | Base64ImageContent:
             if isinstance(c, ConverseTextContent):
                 content = c.text
                 if index == 0 and inference_cfg.response_prefix:
                     content = inference_cfg.response_prefix + content
                 return TextContent(text=content)
-            if isinstance(c, ConverseImageContent):
-                return c.to_b64_image_content()
-            if isinstance(c, ConverseToolResultContent):
-                return ToolResultContent(
-                    tool_use_id = c.toolResult.toolUseId,
-                    content = c.toolResult.content
-                )
-            return ToolUseContent (
-                tool_use_id = c.toolUse.toolUseId,
-                name = c.toolUse.name,
-                input = c.toolUse.input
-            )
+            return c.to_b64_image_content()
 
         if len(self.content) == 1 and isinstance(self.content[0], ConverseTextContent):
             content = self.content[0].text
@@ -237,53 +212,12 @@ class ConverseAssistantMessage(ConverseMessage):
 # Other Request Objects
 
 
-class ConverseToolSpec(BaseModel):
-    """Representation of a tool that Converse can use."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    name: str
-    description: str
-    inputSchema: dict[str, Any]  # noqa: N815
-    _func: Callable[..., Any]
-
-    @classmethod
-    def from_function(cls, func: Callable[..., Any]) -> "Self":
-        """Construct from a python function."""
-        schema = get_function_schema(func)
-        if "parameters" in schema:
-            #Edits openAI's schema to fit converse
-            input_sch = {"json": schema.pop("parameters")}
-            schema["inputSchema"] = input_sch # type: ignore  # noqa: PGH003
-        out = cls.model_validate(schema)
-        out._func = func  # noqa: SLF001
-        return out
-
-    def use(self, tool_use: ConverseToolUseContent) -> ConverseUserMessage:
-        """Use tool and return result as a ConverseUserMessage."""
-        try:
-            func_out = self._func(**tool_use.toolUse.input)
-            result_content = {"json": {"result": str(func_out)}}
-            status = None
-        except Exception as ex:  # noqa: BLE001
-            result_content = {"text": str(ex)}
-            status = "error"
-        block = ConverseToolResultContent(
-            toolResult=ConverseToolResultInnerContent(
-                toolUseId=tool_use.toolUse.toolUseId,
-                content= [result_content],
-                status = status
-            )
-        )
-        return ConverseUserMessage(content=[block])
-
-
 class ConverseSingleTool(BaseModel):
     """Converse single tool model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    toolSpec: ConverseToolSpec  # noqa: N815
+    toolSpec: dict[str, Any]
 
 
 class ConverseTools(BaseModel):
@@ -320,10 +254,10 @@ class ConverseInferenceConfig(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    maxTokens: int | None  # noqa: N815
-    stopSequences: Sequence[str] | None  # noqa: N815
+    maxTokens: int | None
+    stopSequences: Sequence[str] | None
     temperature: float | None
-    topP: float | None  # noqa: N815
+    topP: float | None
 
 
 class ConverseAdditionalModelRequestFields(BaseModel):
@@ -339,15 +273,15 @@ class ConverseInvokeLLMRequest(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    additionalModelRequestFields: ConverseAdditionalModelRequestFields | None = Field( # noqa: N815
+    additionalModelRequestFields: ConverseAdditionalModelRequestFields | None = Field(
         default=None, description="Configuration for any additionoal fields models may need"
     )
 
-    inferenceConfig: ConverseInferenceConfig | None = Field( # noqa: N815
+    inferenceConfig: ConverseInferenceConfig | None = Field(
         default=None, description="Configuration of maxTokens, stopSequences, temperature, topP"
     )
 
-    modelId: str = Field( # noqa: N815
+    modelId: str = Field(
         default=CONVERSE_BEDROCK_MODEL_IDS["Claude 3 Haiku"],
         description="Model used for the Converse api"
     )
@@ -358,7 +292,7 @@ class ConverseInvokeLLMRequest(BaseModel):
 
     system: Sequence[SystemContentBlock] | None = Field(default=None, description="System Prompt")
 
-    toolConfig: ConverseTools | None  = Field( # noqa: N815
+    toolConfig: ConverseTools | None  = Field(
         default=None, description="List of tools that the model may call."
     )
 
@@ -370,9 +304,9 @@ class ConverseUsageInfo(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
-    inputTokens: int # noqa: N815
-    outputTokens: int # noqa: N815
-    totalTokens: int # noqa: N815
+    inputTokens: int
+    outputTokens: int
+    totalTokens: int
 
 class ConverseMessageResponse(BaseModel):
 
@@ -384,20 +318,20 @@ class ConverseMetrics(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
-    latencyMs: int  # noqa: N815
+    latencyMs: int
 
 class ConverseResponse(BaseModel):
     """Converse response model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
-    additionalModelResponseFields: dict[str, Any] | None = Field(default = None)  # noqa: N815
+    additionalModelResponseFields: dict[str, Any] | None = Field(default = None)
     metrics: ConverseMetrics
     output: ConverseMessageResponse
-    performanceConfig: dict[str, Any] | None = Field(default = None)  # noqa: N815
+    performanceConfig: dict[str, Any] | None = Field(default = None)
     ResponseMetadata: dict[str, Any]
     role: Literal["assistant"] = "assistant"
-    stopReason: Literal[  # noqa: N815
+    stopReason: Literal[
         "end_turn", "max_tokens", "stop_sequence", "tool_use"
     ]
     trace: dict[str, Any] | None = Field(default = None)
@@ -411,7 +345,7 @@ def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
     return None
 
 class BedrockConverseLLM(LLM):
-    """An LLM using the Bedrock 'converse' operation."""
+    """Implements the LLM class for Bedrock Converse."""
     client: BedrockRuntimeClient
 
     def __init__(
@@ -442,14 +376,9 @@ class BedrockConverseLLM(LLM):
             stop_sequences = None #stop sequence not implemented yet
             tools = None
 
-            #toolUse not supported yet.
+            #tools not supported yet.
             if config.tools is not None:
-                tools = ConverseTools(
-                    tools = [
-                        ConverseSingleTool(toolSpec=ConverseToolSpec.from_function(f))
-                        for f in config.tools
-                    ],
-                )
+                raise TypeError("Tool use is not currently supported!")
 
             inference_config = ConverseInferenceConfig(
                 maxTokens = config.max_tokens,
@@ -488,22 +417,6 @@ class BedrockConverseLLM(LLM):
             raise ValueError(msg)
         request = self._create_request(messages = messages, config=inference_cfg)
         response = self.invoke_model_with_request(request)
-        if response.stopReason == "tool_use":
-            assert request.toolConfig is not None  # noqa: S101
-            log.info("Tool-use requested:")
-            log.info(response)
-            tool_result_msgs = self.use_tools(response.output.message, request.toolConfig)
-            log.info("Tool-use results:")
-            log.info(tool_result_msgs)
-            new_messages = [
-                *messages,
-                response.output.message.to_llm_message(inference_cfg=inference_cfg),
-                tool_result_msgs.to_llm_message(inference_cfg=inference_cfg)
-            ]
-            return self.prompt(
-                messages = new_messages,
-                inference_cfg = inference_cfg
-            )
         return response.output.message.to_llm_message(inference_cfg)
 
 
@@ -516,23 +429,6 @@ class BedrockConverseLLM(LLM):
         raw_data = json.loads(response_body)
         response = ConverseResponse.model_validate(raw_data)
         return response
-
-    def use_tools(
-        self,
-        content: ConverseMessage,
-        tools: ConverseTools,
-    ) -> ConverseUserMessage:
-        """Invoke tool-use blocks and return user messages."""
-        tools_dict = {t.toolSpec.name: t.toolSpec for t in tools.tools}
-        out_messages = ConverseUserMessage(content=[])
-        for block in content.content:
-            if isinstance(block, ConverseToolUseContent):
-                tool = tools_dict[block.toolUse.name]
-                out_messages.content.append(
-                    tool.use(block).content[0]
-                )
-
-        return out_messages
 
     def _make_client_request(self, request: ConverseInvokeLLMRequest) -> str:
         """Make model invocation request and return raw JSON response."""
