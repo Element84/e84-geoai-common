@@ -28,10 +28,10 @@ CONVERSE_BEDROCK_MODEL_IDS = {
     "Claude 3 Haiku": "us.anthropic.claude-3-haiku-20240307-v1:0",
     "Claude 3.5 Sonnet": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
     "Claude 3 Sonnet": "us.anthropic.claude-3-sonnet-20240229-v1:0",
-    "Claude 3 Opus": "us.anthropic.claude-3-opus-20240229-v1:0",
-    "Claude Instant": "us.anthropic.claude-instant-v1",
-    "Claude 3.5 Haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-    "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "Claude 3 Opus": "anthropic.claude-3-opus-20240229-v1:0",
+    "Claude Instant": "anthropic.claude-instant-v1",
+    "Claude 3.5 Haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
+    "Claude 3.5 Sonnet v2": "anthropic.claude-3-5-sonnet-20241022-v2:0",
     "Nova Lite": "us.amazon.nova-lite-v1:0",
     "Nova Micro": "us.amazon.nova-micro-v1:0",
     "Nova Pro": "us.amazon.nova-pro-v1:0",
@@ -375,10 +375,6 @@ class BedrockConverseLLM(LLM):
                 system = [SystemContentBlock(text=config.system_prompt)]
             stop_sequences = None #stop sequence not implemented yet
             tools = None
-
-            #tools not supported yet.
-            if config.tools is not None:
-                raise TypeError("Tool use is not currently supported!")
 
             inference_config = ConverseInferenceConfig(
                 maxTokens = config.max_tokens,

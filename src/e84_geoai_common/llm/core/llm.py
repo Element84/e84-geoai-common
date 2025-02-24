@@ -86,10 +86,6 @@ class LLMInferenceConfig(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    tools: list[Callable[..., Any]] | None = Field(
-        default=None, description="List of tools that the model may call."
-    )
-
     system_prompt: str | None = Field(default=None, description="System Prompt")
     max_tokens: int = Field(default=1000, description="Maximum number of output tokens")
     temperature: float = Field(
