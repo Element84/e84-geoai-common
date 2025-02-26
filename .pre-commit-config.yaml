@@ -9,6 +9,12 @@ repos:
         types_or: [python, pyi]
         pass_filenames: true
         require_serial: true
+      - id: ruff-format-check
+        name: Check if code has been formatted with Ruff
+        entry: ruff format
+        args: [--check, src/, tests/]
+        language: python
+        types_or: [python, pyi]
       - id: check-added-large-files
         name: Check for added large files
         entry: check-added-large-files
