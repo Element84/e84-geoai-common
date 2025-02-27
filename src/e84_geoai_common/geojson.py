@@ -28,9 +28,7 @@ class Feature(BaseModel, Generic[T]):
             with the feature.
     """
 
-    model_config = ConfigDict(
-        strict=True, frozen=True, arbitrary_types_allowed=True
-    )
+    model_config = ConfigDict(strict=True, frozen=True, arbitrary_types_allowed=True)
 
     type: Literal["Feature"] = "Feature"
     geometry: Annotated[BaseGeometry, SkipValidation]
@@ -43,10 +41,7 @@ class Feature(BaseModel, Generic[T]):
             return geometry_from_geojson_dict(cast(dict[str, Any], d))
         if isinstance(d, BaseGeometry):
             return d
-        msg = (
-            "geometry must be a geojson feature dictionary or "
-            "a shapely geometry."
-        )
+        msg = "geometry must be a geojson feature dictionary or a shapely geometry."
         raise TypeError(msg)
 
     @field_serializer("geometry")

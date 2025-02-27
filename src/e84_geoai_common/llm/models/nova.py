@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Sequence
-from typing import Literal, Self
+from typing import Literal, Self, cast
 
 import boto3
 import botocore.exceptions
@@ -11,6 +11,7 @@ from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
     LLMInferenceConfig,
+    LLMMediaType,
     LLMMessage,
     TextContent,
 )
@@ -20,12 +21,14 @@ log = logging.getLogger(__name__)
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 NOVA_BEDROCK_MODEL_IDS = {
-    "Nova Canvas": "amazon.nova-canvas-v1:0",
-    "Nova Lite": "amazon.nova-lite-v1:0",
-    "Nova Micro": "amazon.nova-micro-v1:0",
-    "Nova Pro": "amazon.nova-pro-v1:0",
-    "Nova Reel": "amazon.nova-reel-v1:0",
+    "Nova Canvas": "us.amazon.nova-canvas-v1:0",
+    "Nova Lite": "us.amazon.nova-lite-v1:0",
+    "Nova Micro": "us.amazon.nova-micro-v1:0",
+    "Nova Pro": "us.amazon.nova-pro-v1:0",
+    "Nova Reel": "us.amazon.nova-reel-v1:0",
 }
+
+NovaImageFormat = Literal["jpeg", "png", "gif", "webp"]
 
 
 class NovaTextContent(BaseModel):
@@ -41,24 +44,36 @@ class NovaImageSource(BaseModel):
     bytes: str
 
 
+class NovaImageInnerContent(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    format: NovaImageFormat
+    source: NovaImageSource
+
+
 class NovaImageContent(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    format: Literal["jpeg", "png", "gif", "webp"]
-    source: NovaImageSource
+    image: NovaImageInnerContent
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
-        img_format = image.media_type.split("/")[-1]
+        img_format: NovaImageFormat = cast(NovaImageFormat, image.media_type.split("/")[-1])
         return cls(
-            format=img_format,  # type: ignore[reportArgumentType]
-            source=NovaImageSource(bytes=image.data),
+            image=NovaImageInnerContent(
+                format=img_format,
+                source=NovaImageSource(bytes=image.data),
+            )
         )
 
     def to_b64_image_content(self) -> Base64ImageContent:
+        media_type: LLMMediaType = cast(
+            LLMMediaType,
+            f"image/{self.image.format}",
+        )
         return Base64ImageContent(
-            format=f"image/{self.format}",  # type: ignore[reportArgumentType]
-            data=self.source.bytes,
+            media_type=media_type,
+            data=self.image.source.bytes,
         )
 
 

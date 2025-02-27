@@ -7,6 +7,8 @@ from function_schema.core import (  # type: ignore[reportMissingTypeStubs]
 )
 from pydantic import BaseModel, ConfigDict, Field
 
+LLMMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
+
 
 class TextContent(BaseModel):
     """Text context model."""
@@ -21,7 +23,7 @@ class Base64ImageContent(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
+    media_type: LLMMediaType
     data: str
 
 

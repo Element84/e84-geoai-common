@@ -23,14 +23,16 @@ ANTHROPIC_API_VERSION = "bedrock-2023-05-31"
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 CLAUDE_BEDROCK_MODEL_IDS = {
-    "Claude 3 Haiku": "anthropic.claude-3-haiku-20240307-v1:0",
-    "Claude 3.5 Sonnet": "anthropic.claude-3-5-sonnet-20240620-v1:0",
-    "Claude 3 Sonnet": "anthropic.claude-3-sonnet-20240229-v1:0",
-    "Claude 3 Opus": "anthropic.claude-3-opus-20240229-v1:0",
-    "Claude Instant": "anthropic.claude-instant-v1",
-    "Claude 3.5 Haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
-    "Claude 3.5 Sonnet v2": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "Claude 3 Haiku": "us.anthropic.claude-3-haiku-20240307-v1:0",
+    "Claude 3.5 Sonnet": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "Claude 3 Sonnet": "us.anthropic.claude-3-sonnet-20240229-v1:0",
+    "Claude 3 Opus": "us.anthropic.claude-3-opus-20240229-v1:0",
+    "Claude Instant": "us.anthropic.claude-instant-v1",
+    "Claude 3.5 Haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
 }
+
+ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
 
 class ClaudeTextContent(BaseModel):
@@ -39,7 +41,7 @@ class ClaudeTextContent(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     type: Literal["text"] = "text"
-    content: str
+    text: str
 
 
 class ClaudeImageSource(BaseModel):
@@ -48,7 +50,7 @@ class ClaudeImageSource(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     type: Literal["base64"] = "base64"
-    media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
+    media_type: ConverseMediaType
     data: str
 
 
@@ -77,7 +79,7 @@ class ClaudeMessage(BaseModel):
             subcontent: TextContent | Base64ImageContent,
         ) -> ClaudeTextContent | ClaudeImageContent:
             if isinstance(subcontent, TextContent):
-                return ClaudeTextContent(content=subcontent.text)
+                return ClaudeTextContent(text=subcontent.text)
             return ClaudeImageContent(
                 source=ClaudeImageSource(media_type=subcontent.media_type, data=subcontent.data)
             )
