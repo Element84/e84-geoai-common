@@ -32,7 +32,7 @@ CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
 }
 
-ClaudeImageFormat = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
+ConverseMediaTypeFormat = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
 
 class ClaudeTextContent(BaseModel):
@@ -50,7 +50,7 @@ class ClaudeImageSource(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     type: Literal["base64"] = "base64"
-    media_type: ClaudeImageFormat
+    media_type: ConverseMediaTypeFormat
     data: str
 
 
