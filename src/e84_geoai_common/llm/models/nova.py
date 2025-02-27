@@ -11,7 +11,7 @@ from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
     LLMInferenceConfig,
-    LLMMediaTypeFormat,
+    LLMMediaType,
     LLMMessage,
     TextContent,
 )
@@ -67,8 +67,8 @@ class NovaImageContent(BaseModel):
         )
 
     def to_b64_image_content(self) -> Base64ImageContent:
-        media_type: LLMMediaTypeFormat = cast(
-            LLMMediaTypeFormat,
+        media_type: LLMMediaType = cast(
+            LLMMediaType,
             f"image/{self.image.format}",
         )
         return Base64ImageContent(

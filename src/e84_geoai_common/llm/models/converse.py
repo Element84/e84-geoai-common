@@ -13,7 +13,7 @@ from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
     LLMInferenceConfig,
-    LLMMediaTypeFormat,
+    LLMMediaType,
     LLMMessage,
     TextContent,
 )
@@ -123,8 +123,8 @@ class ConverseImageContent(BaseModel):
         return cls(image=ConverseImage(format=img_format, source=source))
 
     def to_b64_image_content(self) -> Base64ImageContent:
-        media_type: LLMMediaTypeFormat = cast(
-            LLMMediaTypeFormat,
+        media_type: LLMMediaType = cast(
+            LLMMediaType,
             f"image/{self.image.format}",
         )
         return Base64ImageContent(
