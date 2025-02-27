@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    LLMImageFormat,
     LLMInferenceConfig,
     LLMMessage,
     TextContent,
@@ -41,12 +42,14 @@ CONVERSE_BEDROCK_MODEL_IDS = {
     "Llama 3.2 1B Instruct": "us.meta.llama3-2-1b-instruct-v1:0",
     "Llama 3.2 3B Instruct": "us.meta.llama3-2-3b-instruct-v1:0",
     "Llama 3.2 90B Vision Instruct": "us.meta.llama3-2-90b-instruct-v1:0",
-    "Llama 3.3 70B Instruct": "us.meta.llama3-3-70b-instruct-v1:0"
+    "Llama 3.3 70B Instruct": "us.meta.llama3-3-70b-instruct-v1:0",
 }
 
 
 #################################################################################
 # Messages Object Components
+
+ConverseImageFormat = Literal["jpeg", "png", "gif", "webp"]
 
 
 class ConverseTextContent(BaseModel):
@@ -97,7 +100,6 @@ class ConverseToolResultContent(BaseModel):
 
 
 class ConverseImageSource(BaseModel):
-
     model_config = ConfigDict(strict=True, extra="forbid")
     bytes: bytes
 
@@ -105,7 +107,7 @@ class ConverseImageSource(BaseModel):
 class ConverseImage(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    format: Literal["jpeg", "png", "gif", "webp"]
+    format: ConverseImageFormat
     source: ConverseImageSource
 
 
@@ -116,21 +118,14 @@ class ConverseImageContent(BaseModel):
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
-        img_format: Literal["jpeg", "png", "gif", "webp"] = cast(
-        Literal["jpeg", "png", "gif", "webp"], image.media_type.split("/")[-1]
-    )
-        source=ConverseImageSource(bytes=base64.b64decode(image.data))
-        return cls(
-            image = ConverseImage(
-                format=img_format,
-                source=source
-            )
-        )
+        img_format: ConverseImageFormat = cast(ConverseImageFormat, image.media_type.split("/")[-1])
+        source = ConverseImageSource(bytes=base64.b64decode(image.data))
+        return cls(image=ConverseImage(format=img_format, source=source))
 
     def to_b64_image_content(self) -> Base64ImageContent:
-        media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"] = cast(
-            Literal["image/jpeg", "image/png", "image/gif", "image/webp"],
-            f"image/{self.image.format}"
+        media_type: LLMImageFormat = cast(
+            LLMImageFormat,
+            f"image/{self.image.format}",
         )
         return Base64ImageContent(
             media_type=media_type,
@@ -144,10 +139,7 @@ class ConverseMessage(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     role: Literal["assistant", "user"]
-    content: Sequence[
-            ConverseTextContent | ConverseImageContent
-        ]
-
+    content: Sequence[ConverseTextContent | ConverseImageContent]
 
     @classmethod
     def from_llm_message(cls, msg: LLMMessage) -> Self:
@@ -180,11 +172,11 @@ class ConverseMessage(BaseModel):
             content = self.content[0].text
             if inference_cfg.json_mode:
                 # In JSON mode we need to remove the JSON stop sequence
-                content = [TextContent(text = "{" + content)]
+                content = [TextContent(text="{" + content)]
             elif inference_cfg.response_prefix:
-                content = [TextContent(text = inference_cfg.response_prefix + content)]
+                content = [TextContent(text=inference_cfg.response_prefix + content)]
             else:
-                content = [TextContent(text = content)]
+                content = [TextContent(text=content)]
         else:
             content = [_to_llm_content(index, c) for index, c in enumerate(self.content)]
         return LLMMessage(role=self.role, content=content)
@@ -227,13 +219,14 @@ class ConverseTools(BaseModel):
 
     tools: Sequence[ConverseSingleTool]
 
+
 class ConverseToolChoice(BaseModel):
     """Converse tool choice model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    #only anthropic and mistral models use tool choice. It is not implemented
-    #in the code here yet - this is a dummy class.
+    # only anthropic and mistral models use tool choice. It is not implemented
+    # in the code here yet - this is a dummy class.
     type: Literal["auto", "any", "tool"]
     name: str | None = None
     # disable_parallel_tool_use is documented in Anthropic docs but seems to
@@ -283,7 +276,7 @@ class ConverseInvokeLLMRequest(BaseModel):
 
     modelId: str = Field(
         default=CONVERSE_BEDROCK_MODEL_IDS["Claude 3 Haiku"],
-        description="Model used for the Converse api"
+        description="Model used for the Converse api",
     )
 
     messages: list[ConverseMessage] = Field(
@@ -292,12 +285,14 @@ class ConverseInvokeLLMRequest(BaseModel):
 
     system: Sequence[SystemContentBlock] | None = Field(default=None, description="System Prompt")
 
-    toolConfig: ConverseTools | None  = Field(
+    toolConfig: ConverseTools | None = Field(
         default=None, description="List of tools that the model may call."
     )
 
+
 #################################################################################
 # Response objects
+
 
 class ConverseUsageInfo(BaseModel):
     """Usage info from the Converse API."""
@@ -308,34 +303,34 @@ class ConverseUsageInfo(BaseModel):
     outputTokens: int
     totalTokens: int
 
-class ConverseMessageResponse(BaseModel):
 
+class ConverseMessageResponse(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
     message: ConverseAssistantMessage
 
-class ConverseMetrics(BaseModel):
 
+class ConverseMetrics(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
     latencyMs: int
+
 
 class ConverseResponse(BaseModel):
     """Converse response model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
-    additionalModelResponseFields: dict[str, Any] | None = Field(default = None)
+    additionalModelResponseFields: dict[str, Any] | None = Field(default=None)
     metrics: ConverseMetrics
     output: ConverseMessageResponse
-    performanceConfig: dict[str, Any] | None = Field(default = None)
+    performanceConfig: dict[str, Any] | None = Field(default=None)
     ResponseMetadata: dict[str, Any]
     role: Literal["assistant"] = "assistant"
-    stopReason: Literal[
-        "end_turn", "max_tokens", "stop_sequence", "tool_use"
-    ]
-    trace: dict[str, Any] | None = Field(default = None)
+    stopReason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
+    trace: dict[str, Any] | None = Field(default=None)
     usage: ConverseUsageInfo
+
 
 def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
     if config.json_mode:
@@ -344,8 +339,10 @@ def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
         return config.response_prefix
     return None
 
+
 class BedrockConverseLLM(LLM):
     """Implements the LLM class for Bedrock Converse."""
+
     client: BedrockRuntimeClient
 
     def __init__(
@@ -360,46 +357,44 @@ class BedrockConverseLLM(LLM):
             client: Optional pre-initialized boto3 client. Defaults to None.
         """
         self.model_id = model_id
-        self.client = client or boto3.client("bedrock-runtime") # type: ignore[reportUnknownMemberType]
+        self.client = client or boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]
 
     def _create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ConverseInvokeLLMRequest:
+        response_prefix = _config_to_response_prefix(config)
+        if response_prefix:
+            messages = [*messages, LLMMessage(role="assistant", content=response_prefix)]
+        system = None
+        if config.system_prompt:
+            # For now, just support for a single system prompt content block
+            system = [SystemContentBlock(text=config.system_prompt)]
+        stop_sequences = None  # stop sequence not implemented yet
+        tools = None
 
-            response_prefix = _config_to_response_prefix(config)
-            if response_prefix:
-                messages = [*messages, LLMMessage(role="assistant", content=response_prefix)]
-            system = None
-            if config.system_prompt:
-                #For now, just support for a single system prompt content block
-                system = [SystemContentBlock(text=config.system_prompt)]
-            stop_sequences = None #stop sequence not implemented yet
-            tools = None
+        inference_config = ConverseInferenceConfig(
+            maxTokens=config.max_tokens,
+            stopSequences=stop_sequences,
+            temperature=config.temperature,
+            topP=config.top_p,
+        )
 
-            inference_config = ConverseInferenceConfig(
-                maxTokens = config.max_tokens,
-                stopSequences=stop_sequences,
-                temperature=config.temperature,
-                topP=config.top_p
-            )
-
+        additional_model_request_fields = None
+        if config.top_k:
             additional_model_request_fields = ConverseAdditionalModelRequestFields(
                 top_k=config.top_k
             )
-            if not additional_model_request_fields.model_dump(exclude_none=True):
-                additional_model_request_fields = None
 
-            request = ConverseInvokeLLMRequest(
-                modelId=self.model_id,
-                messages=[ConverseMessage.from_llm_message(msg) for msg in messages],
-                toolConfig=tools,
-                system=system,
-                inferenceConfig=inference_config,
-                additionalModelRequestFields=additional_model_request_fields
-            )
+        request = ConverseInvokeLLMRequest(
+            modelId=self.model_id,
+            messages=[ConverseMessage.from_llm_message(msg) for msg in messages],
+            toolConfig=tools,
+            system=system,
+            inferenceConfig=inference_config,
+            additionalModelRequestFields=additional_model_request_fields,
+        )
 
-            return request
-
+        return request
 
     @timed_function
     def prompt(
@@ -411,19 +406,15 @@ class BedrockConverseLLM(LLM):
         if not messages:
             msg = "Must specify at least one message."
             raise ValueError(msg)
-        request = self._create_request(messages = messages, config=inference_cfg)
+        request = self._create_request(messages=messages, config=inference_cfg)
         response = self.invoke_model_with_request(request)
         return response.output.message.to_llm_message(inference_cfg)
 
-
     @timed_function
-    def invoke_model_with_request(
-        self, request: ConverseInvokeLLMRequest
-    ) -> ConverseResponse:
+    def invoke_model_with_request(self, request: ConverseInvokeLLMRequest) -> ConverseResponse:
         """Invoke model with request and get a response back."""
         response_body = self._make_client_request(request)
-        raw_data = json.loads(response_body)
-        response = ConverseResponse.model_validate(raw_data)
+        response = ConverseResponse.model_validate_json(response_body)
         return response
 
     def _make_client_request(self, request: ConverseInvokeLLMRequest) -> str:
@@ -437,9 +428,7 @@ class BedrockConverseLLM(LLM):
             raise
         return json.dumps(response)
 
-    def _add_prefix_to_response(
-        self, response: ConverseResponse, prefix: str
-    ) -> ConverseResponse:
+    def _add_prefix_to_response(self, response: ConverseResponse, prefix: str) -> ConverseResponse:
         """Prepend the prefix to the first text block in the response."""
         for content_block in response.output.message.content:
             if isinstance(content_block, ConverseTextContent):

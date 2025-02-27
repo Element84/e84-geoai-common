@@ -57,17 +57,18 @@ def test_json_mode() -> None:
     assert isinstance(content, TextContent)
     assert json.loads(content.text) == {"result": [1, 2, 3, 4, 5]}
 
+
 def encode_image_to_base64_str(image_path: str) -> str:
     image = Path(image_path)
     with image.open("rb") as image_file:
         encoded_bytes = base64.b64encode(image_file.read())
     return encoded_bytes.decode("utf-8")
 
-def test_image_input() -> None:
 
+def test_image_input() -> None:
     llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("cat")]))
 
-    #locally ai generated picture of a cat
+    # locally ai generated picture of a cat
     image_path = str(Path(__file__).parent / "images/cat.webp")
     base64_string = encode_image_to_base64_str(image_path)
 

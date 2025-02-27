@@ -57,6 +57,7 @@ def converse_response_with_content(text: str) -> dict[str, Any]:
     """Creates a mock Converse response with the given text."""
     return {"message": {"role": "assistant", "content": [{"text": text}]}}
 
+
 class _MockBedrockRuntimeClient(BedrockRuntimeClient):
     """Implements the bedrock runtime client to return a set of canned responses."""
 
@@ -83,33 +84,25 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
             },
         }
 
-    def converse(
-        self, **_kwargs: Unpack[ConverseRequestRequestTypeDef]
-    ) -> ConverseResponseTypeDef:
+    def converse(self, **_kwargs: Unpack[ConverseRequestRequestTypeDef]) -> ConverseResponseTypeDef:
         """Overrides the invoke_model method to return the next canned response."""
-            # Pop the next canned response (expected to match `message` structure)
+        # Pop the next canned response (expected to match `message` structure)
         next_resp = self.canned_responses.pop(0)
 
         return {
-            "output": next_resp, # type: ignore  # noqa: PGH003
+            "output": next_resp,  # type: ignore  # noqa: PGH003
             "stopReason": "max_tokens",
-            "usage": {
-                "inputTokens": 13,
-                "outputTokens": 50,
-                "totalTokens": 63
-            },
-            "metrics": {
-                "latencyMs": 1040
-            },
+            "usage": {"inputTokens": 13, "outputTokens": 50, "totalTokens": 63},
+            "metrics": {"latencyMs": 1040},
             "ResponseMetadata": {
                 "RequestId": "123",
                 "HTTPStatusCode": 200,
                 "HTTPHeaders": {},
-                "RetryAttempts": 0
+                "RetryAttempts": 0,
             },
             "additionalModelResponseFields": {},
             "trace": {},
-            "performanceConfig": {}
+            "performanceConfig": {},
         }
 
 

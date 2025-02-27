@@ -10,10 +10,7 @@ def generate_circle(
     *, x: float = 0, y: float = 0, radius: float = 10, num_points: int = 10
 ) -> Polygon:
     angle = 2 * pi / num_points
-    points = [
-        (x + radius * cos(i * angle), y + radius * sin(i * angle))
-        for i in range(num_points)
-    ]
+    points = [(x + radius * cos(i * angle), y + radius * sin(i * angle)) for i in range(num_points)]
     return Polygon(points)
 
 

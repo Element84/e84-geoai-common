@@ -62,9 +62,7 @@ def geometry_point_count(geom: BaseGeometry) -> int:  # noqa: PLR0911
         return sum(geometry_point_count(g) for g in geom.geoms)
     if isinstance(geom, shapely.geometry.Polygon):
         exterior_count = geometry_point_count(geom.exterior)
-        interior_count = sum(
-            geometry_point_count(interior) for interior in geom.interiors
-        )
+        interior_count = sum(geometry_point_count(interior) for interior in geom.interiors)
         return exterior_count + interior_count
     if isinstance(geom, shapely.geometry.MultiPolygon):
         return sum(geometry_point_count(g) for g in geom.geoms)
@@ -81,9 +79,7 @@ def geometry_point_count(geom: BaseGeometry) -> int:  # noqa: PLR0911
 
 
 @timed_function
-def simplify_geometry(
-    geom: BaseGeometry, max_points: int = 3_000
-) -> BaseGeometry:
+def simplify_geometry(geom: BaseGeometry, max_points: int = 3_000) -> BaseGeometry:
     """Simplify geometry.
 
     Simplifies a shapely geometry object by reducing the number of points in
@@ -108,10 +104,7 @@ def simplify_geometry(
         simplified = geom.simplify(tolerance)
         if geometry_point_count(simplified) < max_points:
             return simplified
-    msg = (
-        "Unable to simplify the geometry enough to get it under the maximum "
-        "number of points"
-    )
+    msg = "Unable to simplify the geometry enough to get it under the maximum number of points"
     raise ValueError(msg)
 
 

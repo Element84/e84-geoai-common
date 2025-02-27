@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    LLMImageFormat,
     LLMInferenceConfig,
     LLMMessage,
     TextContent,
@@ -26,6 +27,8 @@ NOVA_BEDROCK_MODEL_IDS = {
     "Nova Pro": "us.amazon.nova-pro-v1:0",
     "Nova Reel": "us.amazon.nova-reel-v1:0",
 }
+
+NovaImageFormat = Literal["jpeg", "png", "gif", "webp"]
 
 
 class NovaTextContent(BaseModel):
@@ -44,35 +47,35 @@ class NovaImageSource(BaseModel):
 class NovaImageInnerContent(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    format: Literal["jpeg", "png", "gif", "webp"]
+    format: NovaImageFormat
     source: NovaImageSource
 
+
 class NovaImageContent(BaseModel):
-    model_config = ConfigDict(strict=True, extra ="forbid")
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     image: NovaImageInnerContent
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
-        img_format: Literal["jpeg", "png", "gif", "webp"] = cast(
-        Literal["jpeg", "png", "gif", "webp"], image.media_type.split("/")[-1]
-    )
+        img_format: NovaImageFormat = cast(NovaImageFormat, image.media_type.split("/")[-1])
         return cls(
-            image = NovaImageInnerContent(
+            image=NovaImageInnerContent(
                 format=img_format,
                 source=NovaImageSource(bytes=image.data),
             )
         )
 
     def to_b64_image_content(self) -> Base64ImageContent:
-        media_type: Literal["image/jpeg", "image/png", "image/gif", "image/webp"] = cast(
-            Literal["image/jpeg", "image/png", "image/gif", "image/webp"],
-            f"image/{self.image.format}"
+        media_type: LLMImageFormat = cast(
+            LLMImageFormat,
+            f"image/{self.image.format}",
         )
         return Base64ImageContent(
             media_type=media_type,
             data=self.image.source.bytes,
         )
+
 
 class NovaMessage(BaseModel):
     """Nova message base model."""
