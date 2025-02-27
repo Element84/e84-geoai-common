@@ -1,5 +1,4 @@
 import base64
-import json
 import logging
 from collections.abc import Sequence
 from typing import Any, Literal, Self, cast
@@ -7,6 +6,7 @@ from typing import Any, Literal, Self, cast
 import boto3
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
+from mypy_boto3_bedrock_runtime.type_defs import ConverseResponseTypeDef
 from pydantic import BaseModel, ConfigDict, Field
 
 from e84_geoai_common.llm.core.llm import (
@@ -414,10 +414,10 @@ class BedrockConverseLLM(LLM):
     def invoke_model_with_request(self, request: ConverseInvokeLLMRequest) -> ConverseResponse:
         """Invoke model with request and get a response back."""
         response_body = self._make_client_request(request)
-        response = ConverseResponse.model_validate_json(response_body)
+        response = ConverseResponse.model_validate(response_body)
         return response
 
-    def _make_client_request(self, request: ConverseInvokeLLMRequest) -> str:
+    def _make_client_request(self, request: ConverseInvokeLLMRequest) -> ConverseResponseTypeDef:
         """Make model invocation request and return raw JSON response."""
         try:
             params = request.model_dump(exclude_none=True)
@@ -426,7 +426,7 @@ class BedrockConverseLLM(LLM):
             log.error("Failed with %s", e)  # noqa: TRY400
             log.error("Request body: %s", request)  # noqa: TRY400
             raise
-        return json.dumps(response)
+        return response
 
     def _add_prefix_to_response(self, response: ConverseResponse, prefix: str) -> ConverseResponse:
         """Prepend the prefix to the first text block in the response."""
