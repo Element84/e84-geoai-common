@@ -90,7 +90,7 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
         next_resp = self.canned_responses.pop(0)
 
         return {
-            "output": next_resp,  # type: ignore  # noqa: PGH003
+            "output": next_resp,  # type: ignore[reportReturnType]
             "stopReason": "max_tokens",
             "usage": {"inputTokens": 13, "outputTokens": 50, "totalTokens": 63},
             "metrics": {"latencyMs": 1040},
