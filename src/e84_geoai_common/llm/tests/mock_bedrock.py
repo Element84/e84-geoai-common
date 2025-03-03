@@ -7,9 +7,9 @@ import boto3
 from botocore.response import StreamingBody
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from mypy_boto3_bedrock_runtime.type_defs import (
-    ConverseRequestRequestTypeDef,
+    ConverseRequestTypeDef,
     ConverseResponseTypeDef,
-    InvokeModelRequestRequestTypeDef,
+    InvokeModelRequestTypeDef,
     InvokeModelResponseTypeDef,
 )
 
@@ -24,18 +24,25 @@ def _string_to_streaming_body(string_data: str) -> StreamingBody:
     return StreamingBody(stream, len(bytes_data))
 
 
-def claude_response_with_content(text: str) -> dict[str, Any]:
-    """Creates a mock claude response with the given text."""
-    return {
+def claude_response_with_content(
+    content: str | list[dict[str, Any]], overrides: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Creates a mock claude response with the given content."""
+    if isinstance(content, str):
+        content = [{"type": "text", "text": content}]
+    out = {
         "id": "msg_bdrk_123fake",
         "type": "message",
         "role": "assistant",
         "model": "claude-3-haiku-20240307",
-        "content": [{"type": "text", "text": text}],
+        "content": content,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "usage": {"input_tokens": 123, "output_tokens": 321},
     }
+    if overrides is not None:
+        out.update(overrides)
+    return out
 
 
 def nova_response_with_content(text: str) -> dict[str, Any]:
@@ -68,7 +75,7 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
         self.canned_responses = responses
 
     def invoke_model(
-        self, **_kwargs: Unpack[InvokeModelRequestRequestTypeDef]
+        self, **_kwargs: Unpack[InvokeModelRequestTypeDef]
     ) -> InvokeModelResponseTypeDef:
         """Overrides the invoke_model method to return the next canned response."""
         next_resp = self.canned_responses.pop(0)
@@ -84,7 +91,7 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
             },
         }
 
-    def converse(self, **_kwargs: Unpack[ConverseRequestRequestTypeDef]) -> ConverseResponseTypeDef:
+    def converse(self, **_kwargs: Unpack[ConverseRequestTypeDef]) -> ConverseResponseTypeDef:
         """Overrides the invoke_model method to return the next canned response."""
         # Pop the next canned response (expected to match `message` structure)
         next_resp = self.canned_responses.pop(0)
