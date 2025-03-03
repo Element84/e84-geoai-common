@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools_scm","setuptools-git-versioning"]
+requires = ["setuptools", "setuptools_scm", "setuptools-git-versioning"]
 build-backend = "setuptools.build_meta"
 
 
@@ -90,7 +90,8 @@ ignore = [
   # Multi-line docstring summary should start at the second line
   'D213',
   # Allow messages in exception declarations
-  'TRY003', 'EM101'
+  'TRY003',
+  'EM101',
 ]
 
 [tool.ruff.lint.per-file-ignores]
