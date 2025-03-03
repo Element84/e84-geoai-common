@@ -148,7 +148,7 @@ class ClaudeInvokeLLMRequest(BaseModel):
 # Response objects
 
 
-class ClaudeToolUseResponse(BaseModel):
+class ClaudeToolUseContent(BaseModel):
     """Represents a tool use response from Claude."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -173,7 +173,7 @@ class ClaudeResponse(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
-    content: Sequence[ClaudeTextContent | ClaudeToolUseResponse]
+    content: Sequence[ClaudeTextContent | ClaudeToolUseContent]
     id: str
     model: str
     role: Literal["assistant"] = "assistant"
@@ -239,9 +239,9 @@ class BedrockClaudeLLM(LLM):
         response = self.invoke_model_with_request(request)
 
         def _response_content_to_text(
-            index: int, c: ClaudeTextContent | ClaudeToolUseResponse
+            index: int, c: ClaudeTextContent | ClaudeToolUseContent
         ) -> TextContent:
-            if isinstance(c, ClaudeToolUseResponse):
+            if isinstance(c, ClaudeToolUseContent):
                 raise TypeError("Did not expect a tool use response")
             text = c.text
 
