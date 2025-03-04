@@ -93,6 +93,10 @@ ignore = [
   # Allow messages in exception declarations
   'TRY003',
   'EM101',
+  # TODO comment missing author
+  'TD002',
+  # TODO comment missing linked issue
+  'TD003',
 ]
 
 [tool.ruff.lint.per-file-ignores]

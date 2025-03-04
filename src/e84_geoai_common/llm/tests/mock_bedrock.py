@@ -60,9 +60,32 @@ def nova_response_with_content(text: str) -> dict[str, Any]:
     }
 
 
-def converse_response_with_content(text: str) -> dict[str, Any]:
+def converse_response_with_content(
+    content: str | list[dict[str, Any]], overrides: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Creates a mock Converse response with the given text."""
-    return {"message": {"role": "assistant", "content": [{"text": text}]}}
+    if isinstance(content, str):
+        content = [{"text": content}]
+    out = {
+        "additionalModelResponseFields": None,
+        "metrics": {"latencyMs": 10},
+        "output": {
+            "message": {"role": "assistant", "content": content},
+        },
+        "performanceConfig": None,
+        "ResponseMetadata": {},
+        "role": "assistant",
+        "stopReason": "end_turn",
+        "trace": None,
+        "usage": {
+            "inputTokens": 123,
+            "outputTokens": 123,
+            "totalTokens": 123,
+        },
+    }
+    if overrides is not None:
+        out.update(overrides)
+    return out
 
 
 class _MockBedrockRuntimeClient(BedrockRuntimeClient):
@@ -95,22 +118,7 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
         """Overrides the invoke_model method to return the next canned response."""
         # Pop the next canned response (expected to match `message` structure)
         next_resp = self.canned_responses.pop(0)
-
-        return {
-            "output": next_resp,  # type: ignore[reportReturnType]
-            "stopReason": "max_tokens",
-            "usage": {"inputTokens": 13, "outputTokens": 50, "totalTokens": 63},
-            "metrics": {"latencyMs": 1040},
-            "ResponseMetadata": {
-                "RequestId": "123",
-                "HTTPStatusCode": 200,
-                "HTTPHeaders": {},
-                "RetryAttempts": 0,
-            },
-            "additionalModelResponseFields": {},
-            "trace": {},
-            "performanceConfig": {},
-        }
+        return ConverseResponseTypeDef(**next_resp)
 
 
 def make_test_bedrock_client(
