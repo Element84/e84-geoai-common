@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import Any
 
-from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig
+from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMTool
 
 
 class Agent(ABC):
@@ -10,7 +8,7 @@ class Agent(ABC):
 
     llm: LLM
     inference_cfg: LLMInferenceConfig
-    tools: list[Callable[..., Any]]
+    tools: list[LLMTool]
 
     @property
     @abstractmethod
