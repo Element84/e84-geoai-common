@@ -13,6 +13,9 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMediaType,
     LLMMessage,
+    LLMMessageContentType,
+    LLMToolResultContent,
+    LLMToolUseContent,
     TextContent,
 )
 from e84_geoai_common.util import timed_function
@@ -84,46 +87,6 @@ class NovaMessage(BaseModel):
 
     role: Literal["assistant", "user"] = "user"
     content: Sequence[NovaTextContent | NovaImageContent]
-
-    @classmethod
-    def from_llm_message(cls, msg: LLMMessage) -> Self:
-        def _handle_content(
-            subcontent: TextContent | Base64ImageContent,
-        ) -> NovaTextContent | NovaImageContent:
-            if isinstance(subcontent, TextContent):
-                return NovaTextContent(text=subcontent.text)
-            return NovaImageContent.from_b64_image_content(subcontent)
-
-        if isinstance(msg.content, str):
-            content = [NovaTextContent(text=msg.content)]
-        else:
-            content = [_handle_content(subcontent) for subcontent in msg.content]
-        return cls(role=msg.role, content=content)
-
-    def to_llm_message(self, inference_cfg: LLMInferenceConfig) -> LLMMessage:
-        def _to_llm_content(
-            index: int,
-            c: NovaTextContent | NovaImageContent,
-        ) -> TextContent | Base64ImageContent:
-            if isinstance(c, NovaTextContent):
-                content = c.text
-                if index == 0 and inference_cfg.response_prefix:
-                    content = inference_cfg.response_prefix + content
-                return TextContent(text=content)
-
-            return c.to_b64_image_content()
-
-        if len(self.content) == 1 and isinstance(self.content[0], NovaTextContent):
-            content = self.content[0].text
-            if inference_cfg.json_mode:
-                # In JSON mode we need to remove the JSON stop sequence
-                content = content.removesuffix("```")
-            elif inference_cfg.response_prefix:
-                content = inference_cfg.response_prefix + content
-        else:
-            content = [_to_llm_content(index, c) for index, c in enumerate(self.content)]
-
-        return LLMMessage(role=self.role, content=content)
 
 
 class NovaInferenceConfig(BaseModel):
@@ -225,7 +188,7 @@ class BedrockNovaLLM(LLM):
                 top_k=config.top_k,
                 stop_sequences=stop_sequences,
             ),
-            messages=[NovaMessage.from_llm_message(msg) for msg in messages],
+            messages=[BedrockNovaLLM.llm_message_to_nova_message(msg) for msg in messages],
         )
 
     @timed_function
@@ -240,7 +203,8 @@ class BedrockNovaLLM(LLM):
             raise ValueError(msg)
         request = self._create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        return response.output.message.to_llm_message(inference_cfg)
+        llm_msg = self.response_to_llm_message(response, inference_cfg=inference_cfg)
+        return llm_msg
 
     @timed_function
     def invoke_model_with_request(self, request: NovaInvokeLLMRequest) -> NovaResponse:
@@ -258,6 +222,56 @@ class BedrockNovaLLM(LLM):
         nova_response = NovaResponse.model_validate_json(response_body)
         log.info("Token usage: %s", nova_response.usage)
         return nova_response
+
+    def response_to_llm_message(
+        self, response: NovaResponse, inference_cfg: LLMInferenceConfig
+    ) -> LLMMessage:
+        def _to_llm_content(
+            index: int,
+            c: NovaTextContent | NovaImageContent,
+        ) -> TextContent | Base64ImageContent | LLMToolUseContent:
+            if isinstance(c, NovaTextContent):
+                content = c.text
+                if index == 0 and inference_cfg.response_prefix:
+                    content = inference_cfg.response_prefix + content
+                return TextContent(text=content)
+
+            return c.to_b64_image_content()
+
+        response_msg = response.output.message
+
+        if len(response_msg.content) == 1 and isinstance(response_msg.content[0], NovaTextContent):
+            content = response_msg.content[0].text
+            if inference_cfg.json_mode:
+                # In JSON mode we need to remove the JSON stop sequence
+                content = content.removesuffix("```")
+            elif inference_cfg.response_prefix:
+                content = inference_cfg.response_prefix + content
+        else:
+            content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
+
+        return LLMMessage(role="assistant", content=content)
+
+    @staticmethod
+    def llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
+        """Converts the generic LLM Message into a NovaMessage."""
+
+        def _handle_content(content: LLMMessageContentType) -> NovaTextContent | NovaImageContent:
+            match content:
+                case TextContent():
+                    return NovaTextContent(text=content.text)
+                case Base64ImageContent():
+                    return NovaImageContent.from_b64_image_content(content)
+                case LLMToolUseContent():
+                    raise NotImplementedError
+                case LLMToolResultContent():
+                    raise NotImplementedError
+
+        if isinstance(msg.content, str):
+            content = [NovaTextContent(text=msg.content)]
+        else:
+            content = [_handle_content(subcontent) for subcontent in msg.content]
+        return NovaMessage(role=msg.role, content=content)
 
 
 #########################
