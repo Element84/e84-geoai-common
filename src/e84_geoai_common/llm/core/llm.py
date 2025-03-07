@@ -8,7 +8,7 @@ LLMMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
 
 class TextContent(BaseModel):
-    """Text context model."""
+    """Text content model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
@@ -25,7 +25,7 @@ class Base64ImageContent(BaseModel):
 
 
 class JSONContent(BaseModel):
-    """An image encoded for communication with an LLM."""
+    """JSON content model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
