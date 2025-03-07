@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Sequence
 from typing import Any, cast
@@ -7,7 +8,6 @@ import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from mypy_boto3_bedrock_runtime.type_defs import ConverseResponseTypeDef
 from pydantic import BaseModel, ConfigDict, Field
-from rich.pretty import pretty_repr
 
 from e84_geoai_common.llm.core.llm import (
     LLM,
@@ -312,7 +312,7 @@ class BedrockConverseLLM(LLM):
 
         description = tool.description
         if tool.output_model is not None:
-            output_schema = pretty_repr(tool.output_model.model_json_schema())
+            output_schema = json.dumps(tool.output_model.model_json_schema(), indent=2)
             description = f"{tool.description}\n\nOutput schema:\n```json\n{output_schema}\n```"
 
         converse_tool = ConverseSingleTool(
