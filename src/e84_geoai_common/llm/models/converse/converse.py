@@ -121,6 +121,99 @@ class ConverseInvokeLLMRequest(BaseModel):
     )
 
 
+def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
+    """Converts the generic LLM Message into a ConverseMessage."""
+
+    def _handle_content(content: LLMMessageContentType) -> ConverseMessageContentType:
+        match content:
+            case TextContent():
+                return ConverseTextContent(text=content.text)
+            case Base64ImageContent():
+                return ConverseImageContent.from_b64_image_content(content)
+            case LLMToolUseContent():
+                return ConverseToolUseContent(
+                    toolUse=ConverseToolUse(
+                        toolUseId=content.id, name=content.name, input=content.input
+                    )
+                )
+            case LLMToolResultContent():
+                return _llm_tool_result_to_converse_tool_result(content)
+
+    if isinstance(msg.content, str):
+        content = [ConverseTextContent(text=msg.content)]
+    else:
+        content = [_handle_content(subcontent) for subcontent in msg.content]
+    return ConverseMessage(role=msg.role, content=content)
+
+
+def _llm_tool_to_converse_tool(tool: LLMTool) -> ConverseSingleTool:
+    """Build a ConverseSingleTool from an LLMTool.
+
+    If LLMTool.output_model is set, the JSON schema of the output model is
+    injected into the tool's description so that the LLM is aware of it.
+    """
+    if tool.input_model is None:
+        input_schema = cast(dict[str, Any], {"type": "object", "properties": {}})
+    else:
+        input_schema = tool.input_model.model_json_schema()
+
+    description = tool.description
+    if tool.output_model is not None:
+        output_schema = json.dumps(tool.output_model.model_json_schema(), indent=2)
+        description = f"{tool.description}\n\nOutput schema:\n```json\n{output_schema}\n```"
+
+    converse_tool = ConverseSingleTool(
+        toolSpec=ConverseToolSpec(
+            name=tool.name,
+            description=description,
+            inputSchema=ConverseToolInputSchema(json=input_schema),
+        )
+    )
+    return converse_tool
+
+
+def _llm_tool_choice_to_converse_tool_choice(
+    tool_choice: LLMToolChoice | None,
+) -> ConverseToolChoiceType:
+    if tool_choice is None:
+        return ConverseAutoToolChoice()
+    match tool_choice.mode:
+        case "optional":
+            return ConverseAutoToolChoice()
+        case "force_tool_use":
+            return ConverseAnyToolChoice()
+        case "force_specific_tool_use":
+            if tool_choice.tool_name is None:
+                raise ValueError("Tool name not specified.")
+            return ConverseSpecificToolChoice(tool=ConverseSpecificTool(name=tool_choice.tool_name))
+
+
+def _llm_tool_result_to_converse_tool_result(
+    tool_result: LLMToolResultContent,
+) -> ConverseToolResultContent:
+    def _to_tool_result_content(
+        in_content: LLMDataContentType,
+    ) -> ConverseTextContent | ConverseJSONContent | ConverseImageContent:
+        match in_content:
+            case TextContent():
+                out_content = ConverseTextContent(text=in_content.text)
+            case JSONContent():
+                out_content = ConverseJSONContent(json=in_content.data)
+            case Base64ImageContent():
+                out_content = ConverseImageContent.from_b64_image_content(in_content)
+        return out_content
+
+    out_content = [_to_tool_result_content(c) for c in tool_result.content]
+    out = ConverseToolResultContent(
+        toolResult=ConverseToolResult(
+            toolUseId=tool_result.id,
+            status=tool_result.status,
+            content=out_content,
+        )
+    )
+    return out
+
+
 def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
     if config.json_mode:
         return "{"
@@ -175,15 +268,13 @@ class BedrockConverseLLM(LLM):
 
         tool_config = None
         if config.tools is not None:
-            tools = [BedrockConverseLLM.llm_tool_to_converse_tool(t) for t in config.tools]
-            tool_choice = BedrockConverseLLM.llm_tool_choice_to_converse_tool_choice(
-                config.tool_choice
-            )
+            tools = [_llm_tool_to_converse_tool(t) for t in config.tools]
+            tool_choice = _llm_tool_choice_to_converse_tool_choice(config.tool_choice)
             tool_config = ConverseToolConfig(tools=tools, toolChoice=tool_choice)
 
         request = ConverseInvokeLLMRequest(
             modelId=self.model_id,
-            messages=[BedrockConverseLLM.llm_message_to_converse_message(msg) for msg in messages],
+            messages=[_llm_message_to_converse_message(msg) for msg in messages],
             toolConfig=tool_config,
             system=system,
             inferenceConfig=inference_config,
@@ -272,98 +363,3 @@ class BedrockConverseLLM(LLM):
                 content_block.text = prefix + content_block.text
                 break
         return response
-
-    @staticmethod
-    def llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
-        """Converts the generic LLM Message into a ConverseMessage."""
-
-        def _handle_content(content: LLMMessageContentType) -> ConverseMessageContentType:
-            match content:
-                case TextContent():
-                    return ConverseTextContent(text=content.text)
-                case Base64ImageContent():
-                    return ConverseImageContent.from_b64_image_content(content)
-                case LLMToolUseContent():
-                    return ConverseToolUseContent(
-                        toolUse=ConverseToolUse(
-                            toolUseId=content.id, name=content.name, input=content.input
-                        )
-                    )
-                case LLMToolResultContent():
-                    return BedrockConverseLLM.llm_tool_result_to_converse_tool_result(content)
-
-        if isinstance(msg.content, str):
-            content = [ConverseTextContent(text=msg.content)]
-        else:
-            content = [_handle_content(subcontent) for subcontent in msg.content]
-        return ConverseMessage(role=msg.role, content=content)
-
-    @staticmethod
-    def llm_tool_to_converse_tool(tool: LLMTool) -> ConverseSingleTool:
-        """Build a ConverseSingleTool from an LLMTool.
-
-        If LLMTool.output_model is set, the JSON schema of the output model is
-        injected into the tool's description so that the LLM is aware of it.
-        """
-        if tool.input_model is None:
-            input_schema = cast(dict[str, Any], {"type": "object", "properties": {}})
-        else:
-            input_schema = tool.input_model.model_json_schema()
-
-        description = tool.description
-        if tool.output_model is not None:
-            output_schema = json.dumps(tool.output_model.model_json_schema(), indent=2)
-            description = f"{tool.description}\n\nOutput schema:\n```json\n{output_schema}\n```"
-
-        converse_tool = ConverseSingleTool(
-            toolSpec=ConverseToolSpec(
-                name=tool.name,
-                description=description,
-                inputSchema=ConverseToolInputSchema(json=input_schema),
-            )
-        )
-        return converse_tool
-
-    @staticmethod
-    def llm_tool_choice_to_converse_tool_choice(
-        tool_choice: LLMToolChoice | None,
-    ) -> ConverseToolChoiceType:
-        if tool_choice is None:
-            return ConverseAutoToolChoice()
-        match tool_choice.mode:
-            case "optional":
-                return ConverseAutoToolChoice()
-            case "force_tool_use":
-                return ConverseAnyToolChoice()
-            case "force_specific_tool_use":
-                if tool_choice.tool_name is None:
-                    raise ValueError("Tool name not specified.")
-                return ConverseSpecificToolChoice(
-                    tool=ConverseSpecificTool(name=tool_choice.tool_name)
-                )
-
-    @staticmethod
-    def llm_tool_result_to_converse_tool_result(
-        tool_result: LLMToolResultContent,
-    ) -> ConverseToolResultContent:
-        def _to_tool_result_content(
-            in_content: LLMDataContentType,
-        ) -> ConverseTextContent | ConverseJSONContent | ConverseImageContent:
-            match in_content:
-                case TextContent():
-                    out_content = ConverseTextContent(text=in_content.text)
-                case JSONContent():
-                    out_content = ConverseJSONContent(json=in_content.data)
-                case Base64ImageContent():
-                    out_content = ConverseImageContent.from_b64_image_content(in_content)
-            return out_content
-
-        out_content = [_to_tool_result_content(c) for c in tool_result.content]
-        out = ConverseToolResultContent(
-            toolResult=ConverseToolResult(
-                toolUseId=tool_result.id,
-                status=tool_result.status,
-                content=out_content,
-            )
-        )
-        return out

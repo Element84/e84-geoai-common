@@ -148,6 +148,27 @@ class NovaResponse(BaseModel):
     usage: NovaUsageInfo
 
 
+def _llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
+    """Converts the generic LLM Message into a NovaMessage."""
+
+    def _handle_content(content: LLMMessageContentType) -> NovaTextContent | NovaImageContent:
+        match content:
+            case TextContent():
+                return NovaTextContent(text=content.text)
+            case Base64ImageContent():
+                return NovaImageContent.from_b64_image_content(content)
+            case LLMToolUseContent():
+                raise NotImplementedError
+            case LLMToolResultContent():
+                raise NotImplementedError
+
+    if isinstance(msg.content, str):
+        content = [NovaTextContent(text=msg.content)]
+    else:
+        content = [_handle_content(subcontent) for subcontent in msg.content]
+    return NovaMessage(role=msg.role, content=content)
+
+
 class BedrockNovaLLM(LLM):
     """Implements the LLM class for Bedrock Nova."""
 
@@ -188,7 +209,7 @@ class BedrockNovaLLM(LLM):
                 top_k=config.top_k,
                 stop_sequences=stop_sequences,
             ),
-            messages=[BedrockNovaLLM.llm_message_to_nova_message(msg) for msg in messages],
+            messages=[_llm_message_to_nova_message(msg) for msg in messages],
         )
 
     @timed_function
@@ -251,27 +272,6 @@ class BedrockNovaLLM(LLM):
             content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
 
         return LLMMessage(role="assistant", content=content)
-
-    @staticmethod
-    def llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
-        """Converts the generic LLM Message into a NovaMessage."""
-
-        def _handle_content(content: LLMMessageContentType) -> NovaTextContent | NovaImageContent:
-            match content:
-                case TextContent():
-                    return NovaTextContent(text=content.text)
-                case Base64ImageContent():
-                    return NovaImageContent.from_b64_image_content(content)
-                case LLMToolUseContent():
-                    raise NotImplementedError
-                case LLMToolResultContent():
-                    raise NotImplementedError
-
-        if isinstance(msg.content, str):
-            content = [NovaTextContent(text=msg.content)]
-        else:
-            content = [_handle_content(subcontent) for subcontent in msg.content]
-        return NovaMessage(role=msg.role, content=content)
 
 
 #########################

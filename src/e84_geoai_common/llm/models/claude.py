@@ -188,6 +188,94 @@ class ClaudeResponse(BaseModel):
     usage: ClaudeUsageInfo
 
 
+def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
+    """Converts the generic LLM Message into a ClaudeMessage."""
+
+    def _handle_content(content: LLMMessageContentType) -> ClaudeMessageContentType:
+        match content:
+            case TextContent():
+                return ClaudeTextContent(text=content.text)
+            case Base64ImageContent():
+                return ClaudeImageContent(
+                    source=ClaudeImageSource(media_type=content.media_type, data=content.data)
+                )
+            case LLMToolUseContent():
+                return ClaudeToolUseContent(id=content.id, name=content.name, input=content.input)
+            case LLMToolResultContent():
+                return _llm_tool_result_to_claude_tool_result(content)
+
+    if isinstance(msg.content, str):
+        content = msg.content
+    else:
+        content = [_handle_content(subcontent) for subcontent in msg.content]
+    return ClaudeMessage(role=msg.role, content=content)
+
+
+def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
+    """Build a ClaudeTool from an LLMTool.
+
+    If LLMTool.output_model is set, the JSON schema of the output model is
+    injected into the tool's description so that the LLM is aware of it.
+    """
+    if tool.input_model is None:
+        input_schema = cast(dict[str, Any], {"type": "object", "properties": {}})
+    else:
+        input_schema = tool.input_model.model_json_schema()
+
+    description = tool.description
+    if tool.output_model is not None:
+        output_schema = json.dumps(tool.output_model.model_json_schema(), indent=2)
+        description = f"{tool.description}\n\nOutput schema:\n```json\n{output_schema}\n```"
+
+    claude_tool = ClaudeTool(
+        name=tool.name,
+        description=description,
+        input_schema=input_schema,
+    )
+    return claude_tool
+
+
+def _llm_tool_choice_to_claude_tool_choice(
+    tool_choice: LLMToolChoice | None,
+) -> ClaudeToolChoice:
+    if tool_choice is None:
+        return ClaudeToolChoice(type="auto")
+    match tool_choice.mode:
+        case "optional":
+            return ClaudeToolChoice(type="auto")
+        case "force_tool_use":
+            return ClaudeToolChoice(type="any")
+        case "force_specific_tool_use":
+            return ClaudeToolChoice(type="tool", name=tool_choice.tool_name)
+
+
+def _llm_tool_result_to_claude_tool_result(
+    tool_result: LLMToolResultContent,
+) -> ClaudeToolResultContent:
+    def _to_tool_result_content(
+        in_content: LLMDataContentType,
+    ) -> ClaudeTextContent | ClaudeImageContent:
+        match in_content:
+            case TextContent():
+                out_content = ClaudeTextContent(text=in_content.text)
+            case JSONContent():
+                text = json.dumps(in_content.data, indent=2)
+                out_content = ClaudeTextContent(text=text)
+            case Base64ImageContent():
+                out_content = ClaudeImageContent(
+                    source=ClaudeImageSource(media_type=in_content.media_type, data=in_content.data)
+                )
+        return out_content
+
+    out_content = [_to_tool_result_content(c) for c in tool_result.content]
+    out = ClaudeToolResultContent(
+        tool_use_id=tool_result.id,
+        is_error=(tool_result.status == "error"),
+        content=out_content,
+    )
+    return out
+
+
 def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
     if config.json_mode:
         return "{"
@@ -225,8 +313,8 @@ class BedrockClaudeLLM(LLM):
         tools = None
         tool_choice = None
         if config.tools is not None:
-            tools = [BedrockClaudeLLM.llm_tool_to_claude_tool(t) for t in config.tools]
-            tool_choice = BedrockClaudeLLM.llm_tool_choice_to_claude_tool_choice(config.tool_choice)
+            tools = [_llm_tool_to_claude_tool(t) for t in config.tools]
+            tool_choice = _llm_tool_choice_to_claude_tool_choice(config.tool_choice)
 
         return ClaudeInvokeLLMRequest(
             max_tokens=config.max_tokens,
@@ -236,7 +324,7 @@ class BedrockClaudeLLM(LLM):
             top_p=config.top_p,
             tools=tools,
             tool_choice=tool_choice,
-            messages=[BedrockClaudeLLM.llm_message_to_claude_message(msg) for msg in messages],
+            messages=[_llm_message_to_claude_message(msg) for msg in messages],
         )
 
     @timed_function
@@ -290,95 +378,3 @@ class BedrockClaudeLLM(LLM):
             role="assistant",
             content=[_to_llm_content(i, c) for i, c in enumerate(response.content)],
         )
-
-    @staticmethod
-    def llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
-        """Converts the generic LLM Message into a ClaudeMessage."""
-
-        def _handle_content(content: LLMMessageContentType) -> ClaudeMessageContentType:
-            match content:
-                case TextContent():
-                    return ClaudeTextContent(text=content.text)
-                case Base64ImageContent():
-                    return ClaudeImageContent(
-                        source=ClaudeImageSource(media_type=content.media_type, data=content.data)
-                    )
-                case LLMToolUseContent():
-                    return ClaudeToolUseContent(
-                        id=content.id, name=content.name, input=content.input
-                    )
-                case LLMToolResultContent():
-                    return BedrockClaudeLLM.llm_tool_result_to_claude_tool_result(content)
-
-        if isinstance(msg.content, str):
-            content = msg.content
-        else:
-            content = [_handle_content(subcontent) for subcontent in msg.content]
-        return ClaudeMessage(role=msg.role, content=content)
-
-    @staticmethod
-    def llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
-        """Build a ClaudeTool from an LLMTool.
-
-        If LLMTool.output_model is set, the JSON schema of the output model is
-        injected into the tool's description so that the LLM is aware of it.
-        """
-        if tool.input_model is None:
-            input_schema = cast(dict[str, Any], {"type": "object", "properties": {}})
-        else:
-            input_schema = tool.input_model.model_json_schema()
-
-        description = tool.description
-        if tool.output_model is not None:
-            output_schema = json.dumps(tool.output_model.model_json_schema(), indent=2)
-            description = f"{tool.description}\n\nOutput schema:\n```json\n{output_schema}\n```"
-
-        claude_tool = ClaudeTool(
-            name=tool.name,
-            description=description,
-            input_schema=input_schema,
-        )
-        return claude_tool
-
-    @staticmethod
-    def llm_tool_choice_to_claude_tool_choice(
-        tool_choice: LLMToolChoice | None,
-    ) -> ClaudeToolChoice:
-        if tool_choice is None:
-            return ClaudeToolChoice(type="auto")
-        match tool_choice.mode:
-            case "optional":
-                return ClaudeToolChoice(type="auto")
-            case "force_tool_use":
-                return ClaudeToolChoice(type="any")
-            case "force_specific_tool_use":
-                return ClaudeToolChoice(type="tool", name=tool_choice.tool_name)
-
-    @staticmethod
-    def llm_tool_result_to_claude_tool_result(
-        tool_result: LLMToolResultContent,
-    ) -> ClaudeToolResultContent:
-        def _to_tool_result_content(
-            in_content: LLMDataContentType,
-        ) -> ClaudeTextContent | ClaudeImageContent:
-            match in_content:
-                case TextContent():
-                    out_content = ClaudeTextContent(text=in_content.text)
-                case JSONContent():
-                    text = json.dumps(in_content.data, indent=2)
-                    out_content = ClaudeTextContent(text=text)
-                case Base64ImageContent():
-                    out_content = ClaudeImageContent(
-                        source=ClaudeImageSource(
-                            media_type=in_content.media_type, data=in_content.data
-                        )
-                    )
-            return out_content
-
-        out_content = [_to_tool_result_content(c) for c in tool_result.content]
-        out = ClaudeToolResultContent(
-            tool_use_id=tool_result.id,
-            is_error=(tool_result.status == "error"),
-            content=out_content,
-        )
-        return out
