@@ -203,7 +203,7 @@ class BedrockNovaLLM(LLM):
             raise ValueError(msg)
         request = self._create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        llm_msg = self.response_to_llm_message(response, inference_cfg=inference_cfg)
+        llm_msg = self._response_to_llm_message(response, inference_cfg=inference_cfg)
         return llm_msg
 
     @timed_function
@@ -223,7 +223,7 @@ class BedrockNovaLLM(LLM):
         log.info("Token usage: %s", nova_response.usage)
         return nova_response
 
-    def response_to_llm_message(
+    def _response_to_llm_message(
         self, response: NovaResponse, inference_cfg: LLMInferenceConfig
     ) -> LLMMessage:
         def _to_llm_content(
