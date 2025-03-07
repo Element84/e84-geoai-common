@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools_scm","setuptools-git-versioning"]
+requires = ["setuptools", "setuptools_scm", "setuptools-git-versioning"]
 build-backend = "setuptools.build_meta"
 
 
@@ -18,6 +18,7 @@ dependencies = [
   "shapely>=2.0.6",
   "types-shapely>=2.0.0.20240820",
   "function_schema>=0.4.4",
+  "rich",
 ]
 dynamic = ["version"]
 
@@ -90,7 +91,12 @@ ignore = [
   # Multi-line docstring summary should start at the second line
   'D213',
   # Allow messages in exception declarations
-  'TRY003', 'EM101'
+  'TRY003',
+  'EM101',
+  # TODO comment missing author
+  'TD002',
+  # TODO comment missing linked issue
+  'TD003',
 ]
 
 [tool.ruff.lint.per-file-ignores]

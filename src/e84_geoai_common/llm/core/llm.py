@@ -1,17 +1,14 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
-from typing import Any, Literal, Self
+from collections.abc import Sequence
+from typing import Any, Literal
 
-from function_schema.core import (  # type: ignore[reportMissingTypeStubs]
-    get_function_schema,  # type: ignore[reportUnknownVariableType]
-)
 from pydantic import BaseModel, ConfigDict, Field
 
 LLMMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
 
 class TextContent(BaseModel):
-    """Text context model."""
+    """Text content model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
@@ -27,6 +24,40 @@ class Base64ImageContent(BaseModel):
     data: str
 
 
+class JSONContent(BaseModel):
+    """JSON content model."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    data: dict[str, Any]
+
+
+class LLMToolUseContent(BaseModel):
+    """Tool invocation request."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    id: str = Field(description="ID to track tool invocation and match it to tool output.")
+    name: str = Field(description="Name of tool to invoke.")
+    input: dict[str, Any] = Field(description="Inputs to invoke the tool with.")
+
+
+LLMDataContentType = TextContent | JSONContent | Base64ImageContent
+
+
+class LLMToolResultContent(BaseModel):
+    """Tool invocation result."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    id: str = Field(description="ID of the corresponding LLMToolUseContent.")
+    content: Sequence[LLMDataContentType] = Field(description="The result of the tool invocation.")
+    status: Literal["success", "error"] | None = None
+
+
+LLMMessageContentType = TextContent | Base64ImageContent | LLMToolUseContent | LLMToolResultContent
+
+
 class LLMMessage(BaseModel):
     """Standard representation of an LLM message.
 
@@ -37,7 +68,7 @@ class LLMMessage(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     role: Literal["assistant", "user"] = "user"
-    content: str | Sequence[TextContent | Base64ImageContent]
+    content: str | Sequence[LLMMessageContentType]
 
     def to_text_only(self) -> str:
         """Returns the message as text.
@@ -54,30 +85,38 @@ class LLMMessage(BaseModel):
         return " ".join(parts)
 
 
-class Tool(BaseModel):
-    """Defines a tool that the model may use."""
+class LLMTool(BaseModel):
+    """Definition of a tool that an LLM may use."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
     name: str
     description: str
-    input_schema: dict[str, Any]
+    input_model: type[BaseModel] | None = Field(
+        description="A Pydantic model describing the inputs to the tool. "
+        "Can be set to None to indicate that the tool takes no inputs."
+    )
+    output_model: type[BaseModel] | None = Field(
+        description="A Pydantic model describing the output of the tool. "
+        "Can be set to None to indicate that the tool returns no text or JSON outputs."
+    )
 
-    @classmethod
-    def from_function(cls, func: Callable[..., Any]) -> Self:
-        """Construct from a Python funtion."""
-        # This works because our tool class has the same fields as a Claude tool
-        schema = get_function_schema(func, format="claude")  # type: ignore[reportUnknownVariableType]
-        return cls.model_validate(schema)
 
-
-class ToolUse(BaseModel):
-    """Identifies a selected tool to use."""
+class LLMToolChoice(BaseModel):
+    """Specification for constraining an LLM's choice of tools."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    name: str
-    input: dict[str, Any]
+    mode: Literal["optional", "force_tool_use", "force_specific_tool_use"] = Field(
+        default="optional",
+        description="optional: the LLM may use any of the tools or not use a tool at all. "
+        "force_tool_use: the LLM must use a tool but can choose which tool to use. "
+        "force_specific_tool_use: the LLM must use a tool and it must be the tool specified in "
+        "tool_name.",
+    )
+    tool_name: str | None = Field(
+        None, description="Required if mode is 'force_specific_tool_use'."
+    )
 
 
 class LLMInferenceConfig(BaseModel):
@@ -104,6 +143,14 @@ class LLMInferenceConfig(BaseModel):
     response_prefix: str | None = Field(
         default=None, description="Continue a pre-filled response instead of starting from scratch."
     )
+    tools: list[LLMTool] | None = Field(
+        default=None, description="List of tools that the model may call."
+    )
+    tool_choice: LLMToolChoice | None = Field(
+        default=None,
+        description="Whether the model should use a specific "
+        "tool, or any tool, or decide by itself.",
+    )
 
 
 class LLM(ABC):
@@ -119,9 +166,3 @@ class LLM(ABC):
 
         Returns the LLM message response.
         """
-
-    def prompt_for_tools(
-        self, messages: Sequence[LLMMessage], inference_cfg: LLMInferenceConfig, tools: list[Tool]
-    ) -> ToolUse:
-        """Prompts for a tool to use."""
-        raise NotImplementedError

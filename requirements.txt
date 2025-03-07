@@ -2,19 +2,17 @@
 #    uv pip compile --refresh --all-extras pyproject.toml -o requirements.txt
 annotated-types==0.7.0
     # via pydantic
-appnope==0.1.4
-    # via ipykernel
 asttokens==3.0.0
     # via stack-data
-boto3==1.36.17
+boto3==1.37.6
     # via e84-geoai-common (pyproject.toml)
-boto3-stubs==1.36.17
+boto3-stubs==1.37.6
     # via e84-geoai-common (pyproject.toml)
-botocore==1.36.17
+botocore==1.37.6
     # via
     #   boto3
     #   s3transfer
-botocore-stubs==1.36.17
+botocore-stubs==1.37.4
     # via boto3-stubs
 branca==0.8.1
     # via folium
@@ -28,9 +26,9 @@ charset-normalizer==3.4.1
     # via requests
 comm==0.2.2
     # via ipykernel
-debugpy==1.8.12
+debugpy==1.8.13
     # via ipykernel
-decorator==5.1.1
+decorator==5.2.1
     # via ipython
 distlib==0.3.9
     # via virtualenv
@@ -38,11 +36,11 @@ executing==2.2.0
     # via stack-data
 filelock==3.17.0
     # via virtualenv
-folium==0.19.4
+folium==0.19.5
     # via e84-geoai-common (pyproject.toml)
 function-schema==0.4.5
     # via e84-geoai-common (pyproject.toml)
-identify==2.6.7
+identify==2.6.8
     # via pre-commit
 idna==3.10
     # via requests
@@ -50,8 +48,10 @@ iniconfig==2.0.0
     # via pytest
 ipykernel==6.29.5
     # via e84-geoai-common (pyproject.toml)
-ipython==8.32.0
+ipython==9.0.1
     # via ipykernel
+ipython-pygments-lexers==1.1.1
+    # via ipython
 jedi==0.19.2
     # via ipython
 jinja2==3.1.5
@@ -68,13 +68,17 @@ jupyter-core==5.7.2
     # via
     #   ipykernel
     #   jupyter-client
+markdown-it-py==3.0.0
+    # via rich
 markupsafe==3.0.2
     # via jinja2
 matplotlib-inline==0.1.7
     # via
     #   ipykernel
     #   ipython
-mypy-boto3-bedrock-runtime==1.36.2
+mdurl==0.1.2
+    # via markdown-it-py
+mypy-boto3-bedrock-runtime==1.37.0
     # via boto3-stubs
 nest-asyncio==1.6.0
     # via ipykernel
@@ -82,7 +86,7 @@ nodeenv==1.9.1
     # via
     #   pre-commit
     #   pyright
-numpy==2.2.2
+numpy==2.2.3
     # via
     #   folium
     #   shapely
@@ -108,7 +112,7 @@ pre-commit-hooks==5.0.0
     # via e84-geoai-common (pyproject.toml)
 prompt-toolkit==3.0.50
     # via ipython
-psutil==6.1.1
+psutil==7.0.0
     # via ipykernel
 ptyprocess==0.7.0
     # via pexpect
@@ -119,12 +123,15 @@ pydantic==2.10.6
 pydantic-core==2.27.2
     # via pydantic
 pygments==2.19.1
-    # via ipython
+    # via
+    #   ipython
+    #   ipython-pygments-lexers
+    #   rich
 pyproject-hooks==1.2.0
     # via build
-pyright==1.1.393
+pyright==1.1.396
     # via e84-geoai-common (pyproject.toml)
-pytest==8.3.4
+pytest==8.3.5
     # via e84-geoai-common (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
@@ -138,13 +145,15 @@ pyzmq==26.2.1
     #   jupyter-client
 requests==2.32.3
     # via folium
+rich==13.9.4
+    # via e84-geoai-common (pyproject.toml)
 ruamel-yaml==0.18.10
     # via pre-commit-hooks
 ruamel-yaml-clib==0.2.12
     # via ruamel-yaml
-ruff==0.9.6
+ruff==0.9.9
     # via e84-geoai-common (pyproject.toml)
-s3transfer==0.11.2
+s3transfer==0.11.4
     # via boto3
 shapely==2.0.7
     # via e84-geoai-common (pyproject.toml)
@@ -166,7 +175,7 @@ traitlets==5.14.3
     #   matplotlib-inline
 types-awscrt==0.23.10
     # via botocore-stubs
-types-s3transfer==0.11.2
+types-s3transfer==0.11.3
     # via boto3-stubs
 types-shapely==2.0.0.20250202
     # via e84-geoai-common (pyproject.toml)
