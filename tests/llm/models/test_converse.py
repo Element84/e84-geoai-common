@@ -156,6 +156,7 @@ def test_tool_use_json() -> None:
     messages = [LLMMessage(content=prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
+    # print out solution if doing a live test, so we can inspect it if the test fails
     if not isinstance(client, _MockBedrockRuntimeClient):
         rich_print(resp)
 
@@ -174,6 +175,7 @@ def test_tool_use_json() -> None:
     messages = [*messages, resp, LLMMessage(content=[tool_result_content])]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
+    # print out solution if doing a live test, so we can inspect it if the test fails
     if not isinstance(client, _MockBedrockRuntimeClient):
         rich_print(resp)
 
@@ -225,6 +227,7 @@ def test_tool_use_image() -> None:
     messages = [LLMMessage(content=prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
+    # print out solution if doing a live test, so we can inspect it if the test fails
     if not isinstance(client, _MockBedrockRuntimeClient):
         rich_print(resp)
 
@@ -243,6 +246,7 @@ def test_tool_use_image() -> None:
     messages = [*messages, resp, LLMMessage(content=[tool_result_content])]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
+    # print out solution if doing a live test, so we can inspect it if the test fails
     if not isinstance(client, _MockBedrockRuntimeClient):
         rich_print(resp)
 
