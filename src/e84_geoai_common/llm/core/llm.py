@@ -107,7 +107,13 @@ class LLMToolChoice(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    mode: Literal["optional", "force_tool_use", "force_specific_tool_use"] = "optional"
+    mode: Literal["optional", "force_tool_use", "force_specific_tool_use"] = Field(
+        default="optional",
+        description="optional: the LLM may use any of the tools or not use a tool at all. "
+        "force_tool_use: the LLM must use a tool but can choose which tool to use. "
+        "force_specific_tool_use: the LLM must use a tool and it must be the tool specified in "
+        "tool_name.",
+    )
     tool_name: str | None = Field(
         None, description="Required if mode is 'force_specific_tool_use'."
     )
