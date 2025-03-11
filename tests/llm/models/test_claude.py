@@ -137,7 +137,6 @@ def test_tool_use_json() -> None:
             [
                 {"text": "It's always sunny in Philadelphia."},
             ],
-            overrides={"stop_reason": "tool_use"},
         ),
     ]
     client = make_test_bedrock_client(dummy_responses)
@@ -206,7 +205,6 @@ def test_tool_use_image() -> None:
             [
                 {"text": "The image contains a cat."},
             ],
-            overrides={"stop_reason": "tool_use"},
         ),
     ]
     client = make_test_bedrock_client(dummy_responses)
