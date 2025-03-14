@@ -19,6 +19,7 @@ dependencies = [
   "types-shapely>=2.0.0.20240820",
   "function_schema>=0.4.4",
   "rich",
+  "mypy-boto3-bedrock-runtime>=1.37.0",
 ]
 dynamic = ["version"]
 
