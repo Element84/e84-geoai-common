@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -100,6 +100,32 @@ class LLMTool(BaseModel):
         description="A Pydantic model describing the output of the tool. "
         "Can be set to None to indicate that the tool returns no text or JSON outputs."
     )
+    execution_func: Callable[[LLMToolUseContent], LLMToolResultContent] | None = Field(
+        default=None,
+        exclude=True,
+        description="A function that implements the execution of the tool. "
+        "The function is expected to take in a LLMToolUseContent and return a "
+        "LLMToolResultContent with a matching ID.",
+    )
+
+    def execute(self, tool_use_request: LLMToolUseContent) -> LLMToolResultContent:
+        """Call execution_function with tool_use_request and return the result.
+
+        Raises:
+            NotImplementedError: If execution_func is not set.
+            ValueError: If the ID of LLMToolResultContent returned by execution_func
+                does not match the tool_use_request ID.
+        """
+        if self.execution_func is None:
+            raise NotImplementedError("execution_func not set for this tool.")
+        tool_result = self.execution_func(tool_use_request)
+        if tool_result.id != tool_use_request.id:
+            msg = (
+                f"Tool result ID does not match tool call ID for tool {self.name} for input: "
+                f"{tool_use_request.input}."
+            )
+            raise ValueError(msg)
+        return tool_result
 
 
 class LLMToolChoice(BaseModel):
