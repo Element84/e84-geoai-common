@@ -1,14 +1,15 @@
+import functools
 import logging
 import os
 import textwrap
 from collections.abc import Callable
 from time import perf_counter
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast, overload
 
 log = logging.getLogger(__name__)
 
 
-T = TypeVar("T", bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 def get_env_var(name: str, default: str | None = None) -> str:
@@ -70,25 +71,58 @@ def singleline(text: str) -> str:
     return dedent(text).replace("\n", " ")
 
 
-def timed_function(func: T) -> T:
-    """Decorate a function to log execution time.
+@overload
+def timed_function(arg: F) -> F: ...
 
-    This decorator will print the execution time of the decorated function
-    after it finishes executing.
 
-    Args:
-        func (Callable): The function to be timed.
+@overload
+def timed_function(arg: logging.Logger | None = None) -> Callable[[F], F]: ...
 
-    Returns:
-        Callable: The decorated function.
+
+def timed_function(
+    arg: Callable[..., Any] | logging.Logger | None = None,
+) -> Callable[..., Any] | Callable[[F], F]:
+    """A decorator that times function execution.
+
+    Can be used with or without arguments:
+
+    @timed_function
+    def func(): ...
+
+    @timed_function(logger)
+    def func(): ...
     """
+    # If called without arguments, arg will be the function itself
+    if callable(arg):
+        func = cast(F, arg)
 
-    def wrapper(*args: list[Any], **kwargs: dict[str, Any]) -> Any:  # noqa: ANN401
-        start_time = perf_counter()
-        result = func(*args, **kwargs)
-        end_time = perf_counter()
-        diff = end_time - start_time
-        log.info("%s took %f seconds to run.", func.__name__, diff)
-        return result
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+            start_time = perf_counter()
+            result = func(*args, **kwargs)
+            end_time = perf_counter()
+            # Use default logger in this case
+            log.info("%s took %.4f seconds to execute", func.__name__, end_time - start_time)
+            return result
 
-    return wrapper  # type: ignore[reportReturnType]
+        return cast(F, wrapper)
+
+    # If called with arguments (or None), return a decorator that will be called with the function
+    custom_logger = arg  # This is the logger passed in or None
+
+    def decorator(func: F) -> F:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+            start_time = perf_counter()
+            result = func(*args, **kwargs)
+            end_time = perf_counter()
+            # Use custom logger if provided, otherwise create a default one
+            logger_to_use = custom_logger or log
+            logger_to_use.info(
+                "%s took %.4f seconds to execute", func.__name__, end_time - start_time
+            )
+            return result
+
+        return cast(F, wrapper)
+
+    return decorator
