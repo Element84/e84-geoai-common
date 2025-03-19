@@ -94,6 +94,7 @@ ignore = [
   # Allow messages in exception declarations
   'TRY003',
   'EM101',
+  'EM102',
   # TODO comment missing author
   'TD002',
   # TODO comment missing linked issue

@@ -2,7 +2,7 @@ import functools
 import logging
 import os
 import textwrap
-from collections.abc import Callable
+from collections.abc import Callable, Generator, Iterable
 from time import perf_counter
 from typing import Any, TypeVar, cast, overload
 
@@ -126,3 +126,72 @@ def timed_function(
         return cast(F, wrapper)
 
     return decorator
+
+
+def chunk_items[T](seq: Iterable[T], chunk_size: int) -> Generator[list[T], None, None]:
+    """Split an iterator into chunks of a specified size.
+
+    This function takes an iterator and produces a generator that yields
+    fixed-size lists (chunks) of items from the original iterator. The final
+    chunk may contain fewer items if there aren't enough elements remaining
+    to fill a complete chunk.
+
+    Args:
+        seq (Iterable[T]): The input iterator containing items to be chunked.
+        chunk_size (int): The size of each chunk to produce.
+
+    Yields:
+        list[T]: Lists containing at most `chunk_size` items from the original iterator.
+
+    Example:
+        >>> list(chunk_items(iter([1, 2, 3, 4, 5]), 2))
+        [[1, 2], [3, 4], [5]]
+    """
+    if chunk_size <= 0:
+        raise ValueError(f"chunk_size [{chunk_size}] must be greater than or equal to 1")
+    chunk: list[T] = []
+    for item in seq:
+        chunk.append(item)
+        if len(chunk) >= chunk_size:
+            yield chunk
+            chunk = []
+    if len(chunk) > 0:
+        yield chunk
+
+
+def unique_by[T, K](
+    items: Iterable[T],
+    *,
+    key_fn: Callable[[T], K] = lambda x: x,
+    duplicate_handler_fn: Callable[[T, K], None] | None = None,
+) -> Generator[T, None, None]:
+    """Filter an iterator to yield only items with unique keys.
+
+    This function takes an iterator and yields only the first item encountered for each unique key,
+    filtering out subsequent items with duplicate keys. Optionally handles duplicates with a custom
+    function.
+
+    Args:
+        items (Iterable[T]): The input iterator containing items to be filtered for uniqueness.
+        key_fn (Callable[[T], K]): A function that extracts the key to determine uniqueness.
+            Defaults to the identity function (using the item itself as its key).
+        duplicate_handler_fn (Callable[[T, K], None] | None): Optional function to call when
+            encountering duplicate items. Receives the duplicate item and its key. Defaults to None.
+
+    Yields:
+        T: Items from the original iterator with unique keys.
+
+    Example:
+        >>> data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 1, "name": "Alex"}]
+        >>> list(unique_by(data, key_fn=lambda x: x["id"]))
+        [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
+    """
+    keys: set[K] = set()
+
+    for item in items:
+        key = key_fn(item)
+        if key not in keys:
+            keys.add(key)
+            yield item
+        elif duplicate_handler_fn:
+            duplicate_handler_fn(item, key)
