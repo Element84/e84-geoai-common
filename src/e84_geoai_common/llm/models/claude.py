@@ -194,7 +194,7 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
     def _handle_content(content: LLMMessageContentType) -> ClaudeMessageContentType:
         match content:
             case TextContent():
-                return ClaudeTextContent(text=content.text)
+                return ClaudeTextContent(type="text", text=content.text)
             case Base64ImageContent():
                 return ClaudeImageContent(
                     source=ClaudeImageSource(media_type=content.media_type, data=content.data)
@@ -205,7 +205,7 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
                 return _llm_tool_result_to_claude_tool_result(content)
 
     if isinstance(msg.content, str):
-        content = msg.content
+        content = [ClaudeTextContent(type="text", text=msg.content)]
     else:
         content = [_handle_content(subcontent) for subcontent in msg.content]
     return ClaudeMessage(role=msg.role, content=content)
