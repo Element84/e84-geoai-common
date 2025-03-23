@@ -195,3 +195,39 @@ def unique_by[T, K](
             yield item
         elif duplicate_handler_fn:
             duplicate_handler_fn(item, key)
+
+
+def group_by[T, K](
+    items: Iterable[T], *, key_fn: Callable[[T], K] = lambda x: x
+) -> dict[K, list[T]]:
+    """Group items from an iterable by keys produced by a key function.
+
+    This function takes an iterable and groups its items into a dictionary where the keys are
+    determined by applying the key_fn to each item, and the values are lists of all items that
+    produce the same key.
+
+    Args:
+        items (Iterable[T]): The input iterable containing items to be grouped.
+        key_fn (Callable[[T], K]): A function that extracts the key to determine the group.
+            Defaults to the identity function (using the item itself as its key).
+
+    Returns:
+        dict[K, list[T]]: A dictionary where keys are the unique keys produced by key_fn
+        and values are lists of all items that produced that key.
+
+    Example:
+        >>> data = [{"type": "fruit", "name": "apple"}, {"type": "fruit", "name": "banana"},
+        ...         {"type": "vegetable", "name": "carrot"}]
+        >>> group_by(data, key_fn=lambda x: x["type"])
+        {
+            "fruit": [{"type": "fruit", "name": "apple"}, {"type": "fruit", "name": "banana"}],
+            "vegetable": [{"type": "vegetable", "name": "carrot"}]
+        }
+    """
+    result: dict[K, list[T]] = {}
+    for item in items:
+        key = key_fn(item)
+        if key not in result:
+            result[key] = []
+        result[key].append(item)
+    return result
