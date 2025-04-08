@@ -94,7 +94,7 @@ def timed_function(
     """
     # If called without arguments, arg will be the function itself
     if callable(arg):
-        func = cast(F, arg)
+        func = cast("F", arg)
 
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
@@ -105,7 +105,7 @@ def timed_function(
             log.info("%s took %.4f seconds to execute", func.__name__, end_time - start_time)
             return result
 
-        return cast(F, wrapper)
+        return cast("F", wrapper)
 
     # If called with arguments (or None), return a decorator that will be called with the function
     custom_logger = arg  # This is the logger passed in or None
@@ -123,7 +123,7 @@ def timed_function(
             )
             return result
 
-        return cast(F, wrapper)
+        return cast("F", wrapper)
 
     return decorator
 
