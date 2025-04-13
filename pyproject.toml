@@ -99,6 +99,8 @@ ignore = [
   'TD002',
   # TODO comment missing linked issue
   'TD003',
+  # TODO missing colon
+  'TD004'
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -1,9 +1,120 @@
 from math import cos, pi, sin
 
-from shapely import GeometryCollection, LineString, Point
+from shapely import (
+    MultiPolygon,
+    Point,
+    count_coordinates,
+)
 from shapely.geometry.polygon import Polygon
+from shapely.validation import explain_validity
 
-from e84_geoai_common.geometry import geometry_point_count, simplify_geometry
+from e84_geoai_common.geometry import (
+    remove_extraneous_geom,
+    simplify_geometry,
+)
+
+# A simple diagram showing the geometry for the following test.
+#                A                     B              C
+#    ┌─────────────────────┐       ┌──────────┐     ┌───┐
+# 15 │                     │       │          │     │   │
+#    │ ┌────────┐          │       │  B1      │     └───┘
+#    │ │ A1     │          │       │  ┌──┐    │
+#    │ │        │          │       │  └──┘    │
+#    │ │        │          │       │          │
+# 10 │ └────────┘          │       │   B2     │
+#    │                     │       │  ┌───┐   │
+#    │             A2      │       │  └───┘   │
+#    │            ┌─┐      │       │          │
+#    │            └─┘      │       │          │
+# 5  │                     │       │   B3     │
+#    └─────────────────────┘       │  ┌──┐    │
+#                                  │  └──┘    │
+#                                  │          │
+# 1                                └──────────┘
+#    5   10   15   20   25   30   35   40   45   50   55   60
+
+a_exterior = [(4, 5), (29, 5), (29, 16), (4, 16), (4, 5)]
+a_interior_1 = [(5, 10), (5, 15), (15, 15), (15, 10), (5, 10)]
+a_interior_2 = [(15, 7), (15, 9), (20, 9), (20, 7), (15, 7)]
+b_exterior = [(35, 1), (47, 1), (47, 16), (35, 16), (35, 1)]
+b_interior_1 = [(37, 12), (37, 14), (43, 14), (43, 12), (37, 12)]
+b_interior_2 = [(37, 7), (37, 9), (43, 9), (43, 7), (37, 7)]
+b_interior_3 = [(37, 2), (37, 4), (41, 4), (41, 2), (37, 2)]
+c_exterior = [(50, 13), (55, 13), (55, 15), (50, 15), (50, 13)]
+
+abc_multipolygon = MultiPolygon(
+    [
+        Polygon(a_exterior, [a_interior_1, a_interior_2]),
+        Polygon(
+            b_exterior,
+            [
+                b_interior_1,
+                b_interior_2,
+                b_interior_3,
+            ],
+        ),
+        Polygon(c_exterior),
+    ]
+)
+
+
+def test_remove_extraneous_geoms():
+    expected_geoms = [
+        (5, MultiPolygon([Polygon(a_exterior)])),
+        (10, MultiPolygon([Polygon(a_exterior), Polygon(b_exterior)])),
+        (15, MultiPolygon([Polygon(a_exterior, [a_interior_1]), Polygon(b_exterior)])),
+        (
+            20,
+            MultiPolygon(
+                [
+                    Polygon(a_exterior, [a_interior_1]),
+                    Polygon(b_exterior, [b_interior_1]),
+                ]
+            ),
+        ),
+        (
+            25,
+            MultiPolygon(
+                [
+                    Polygon(a_exterior, [a_interior_1]),
+                    Polygon(b_exterior, [b_interior_1, b_interior_2]),
+                ]
+            ),
+        ),
+        (
+            30,
+            MultiPolygon(
+                [
+                    Polygon(a_exterior, [a_interior_1, a_interior_2]),
+                    Polygon(b_exterior, [b_interior_1, b_interior_2]),
+                ]
+            ),
+        ),
+        (
+            35,
+            MultiPolygon(
+                [
+                    Polygon(a_exterior, [a_interior_1, a_interior_2]),
+                    Polygon(b_exterior, [b_interior_1, b_interior_2]),
+                    Polygon(c_exterior),
+                ]
+            ),
+        ),
+        (
+            40,
+            MultiPolygon(
+                [
+                    Polygon(a_exterior, [a_interior_1, a_interior_2]),
+                    Polygon(b_exterior, [b_interior_1, b_interior_2, b_interior_3]),
+                    Polygon(c_exterior),
+                ]
+            ),
+        ),
+    ]
+    for max_points, expected in expected_geoms:
+        reduced = remove_extraneous_geom(abc_multipolygon, max_points=max_points)
+        assert reduced == expected
+        assert reduced.is_valid, explain_validity(reduced)
 
 
 def generate_circle(
@@ -12,47 +123,6 @@ def generate_circle(
     angle = 2 * pi / num_points
     points = [(x + radius * cos(i * angle), y + radius * sin(i * angle)) for i in range(num_points)]
     return Polygon(points)
-
-
-def test_geometry_point_count():
-    # Point
-    assert geometry_point_count(Point(1, 1)) == 1
-
-    # Polygon with exterior ring
-    assert geometry_point_count(generate_circle(num_points=10)) == 10
-
-    # Polygon with hole
-    exterior = generate_circle(radius=20, num_points=10)
-    interior = generate_circle(radius=5, num_points=7)
-    polygon_with_hole = exterior.difference(interior)
-    assert geometry_point_count(polygon_with_hole) == 17
-
-    # MultiPolygon
-    other_poly = generate_circle(x=40, y=40, num_points=12)
-    multipolygon = polygon_with_hole.union(other_poly)
-    assert geometry_point_count(multipolygon) == 17 + 12
-
-    # Linear Ring
-    assert geometry_point_count(exterior.exterior) == 10
-
-    # MultiPoint
-    multipoint = Point(1, 1).union(Point(2, 2)).union(Point(3, 3))
-    assert geometry_point_count(multipoint) == 3
-
-    # LineString
-    line1 = LineString([(0, 0), (1, 1), (2, 2)])
-    assert geometry_point_count(line1) == 3
-
-    line2 = LineString([(0, 1), (1, 2), (2, 3), (3, 3)])
-    assert geometry_point_count(line2) == 4
-
-    # MultiLineString
-    multiline = line1.union(line2)
-    assert geometry_point_count(multiline) == 7
-
-    # Geometry Collection
-    collection = GeometryCollection([multipolygon, multipoint, multiline])
-    assert geometry_point_count(collection) == 17 + 12 + 3 + 7
 
 
 def test_simplify_geometry():
@@ -64,4 +134,4 @@ def test_simplify_geometry():
     # points
     assert simplify_geometry(polygon, 300) == polygon
 
-    assert geometry_point_count(simplify_geometry(polygon, 199)) <= 199
+    assert count_coordinates(simplify_geometry(polygon, 199)) <= 199
