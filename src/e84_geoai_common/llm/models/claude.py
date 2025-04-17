@@ -303,7 +303,7 @@ class BedrockClaudeLLM(LLM):
         self.model_id = model_id
         self.client = client or boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]
 
-    def _create_request(
+    def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ClaudeInvokeLLMRequest:
         response_prefix = _config_to_response_prefix(config)
@@ -336,7 +336,7 @@ class BedrockClaudeLLM(LLM):
         """Prompt the LLM with a message and optional conversation history."""
         if len(messages) == 0:
             raise ValueError("Must specify at least one message.")
-        request = self._create_request(messages, inference_cfg)
+        request = self.create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
         llm_msg = self._response_to_llm_message(response, inference_cfg=inference_cfg)
         return llm_msg

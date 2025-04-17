@@ -156,6 +156,8 @@ class LLMInferenceConfig(BaseModel):
 class LLM(ABC):
     """An abstract base class for interacting with an LLM."""
 
+    model_id: str
+
     @abstractmethod
     def prompt(
         self,

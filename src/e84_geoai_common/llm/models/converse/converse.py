@@ -241,7 +241,7 @@ class BedrockConverseLLM(LLM):
         self.model_id = model_id
         self.client = client or boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]
 
-    def _create_request(
+    def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ConverseInvokeLLMRequest:
         response_prefix = _config_to_response_prefix(config)
@@ -293,7 +293,7 @@ class BedrockConverseLLM(LLM):
         if not messages:
             msg = "Must specify at least one message."
             raise ValueError(msg)
-        request = self._create_request(messages=messages, config=inference_cfg)
+        request = self.create_request(messages=messages, config=inference_cfg)
         response = self.invoke_model_with_request(request)
         llm_msg = self._response_to_llm_message(response, inference_cfg=inference_cfg)
         return llm_msg

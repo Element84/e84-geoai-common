@@ -2,6 +2,8 @@
 #    uv pip compile --refresh --all-extras pyproject.toml -o requirements.txt
 annotated-types==0.7.0
     # via pydantic
+appnope==0.1.4
+    # via ipykernel
 asttokens==3.0.0
     # via stack-data
 boto3==1.37.6
@@ -78,7 +80,11 @@ matplotlib-inline==0.1.7
     #   ipython
 mdurl==0.1.2
     # via markdown-it-py
+mypy-boto3-bedrock==1.37.29
+    # via boto3-stubs
 mypy-boto3-bedrock-runtime==1.37.0
+    # via boto3-stubs
+mypy-boto3-s3==1.37.24
     # via boto3-stubs
 nest-asyncio==1.6.0
     # via ipykernel
