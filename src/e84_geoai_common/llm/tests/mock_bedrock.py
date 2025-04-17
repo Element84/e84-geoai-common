@@ -7,9 +7,9 @@ import boto3
 from botocore.response import StreamingBody
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from mypy_boto3_bedrock_runtime.type_defs import (
-    ConverseRequestRequestTypeDef,
+    ConverseRequestTypeDef,
     ConverseResponseTypeDef,
-    InvokeModelRequestRequestTypeDef,
+    InvokeModelRequestTypeDef,
     InvokeModelResponseTypeDef,
 )
 
@@ -98,7 +98,7 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
         self.canned_responses = responses
 
     def invoke_model(
-        self, **_kwargs: Unpack[InvokeModelRequestRequestTypeDef]
+        self, **_kwargs: Unpack[InvokeModelRequestTypeDef]
     ) -> InvokeModelResponseTypeDef:
         """Overrides the invoke_model method to return the next canned response."""
         next_resp = self.canned_responses.pop(0)
@@ -114,7 +114,7 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
             },
         }
 
-    def converse(self, **_kwargs: Unpack[ConverseRequestRequestTypeDef]) -> ConverseResponseTypeDef:
+    def converse(self, **_kwargs: Unpack[ConverseRequestTypeDef]) -> ConverseResponseTypeDef:
         """Overrides the invoke_model method to return the next canned response."""
         # Pop the next canned response (expected to match `message` structure)
         next_resp = self.canned_responses.pop(0)
