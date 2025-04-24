@@ -38,6 +38,7 @@ CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude Instant": "us.anthropic.claude-instant-v1",
     "Claude 3.5 Haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
     "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "Claude 3.7 Sonnet": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
 }
 
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
@@ -171,6 +172,8 @@ class ClaudeUsageInfo(BaseModel):
 
     input_tokens: int
     output_tokens: int
+    cache_creation_input_tokens: int | None = None
+    cache_read_input_tokens: int | None = None
 
 
 class ClaudeResponse(BaseModel):
