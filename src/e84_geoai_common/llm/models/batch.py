@@ -13,7 +13,7 @@ from e84_geoai_common.llm.models.claude import (
     ClaudeInvokeLLMRequest,
     ClaudeResponse,
 )
-from e84_geoai_common.llm.models.nova import NovaInvokeLLMRequest, NovaResponse
+from e84_geoai_common.llm.models.nova import BedrockNovaLLM, NovaInvokeLLMRequest, NovaResponse
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
@@ -26,19 +26,32 @@ class BatchRecordInput(BaseModel):
     modelInput: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest
 
 
-class BatchRecordOutput(BaseModel):
-    """Single batch result model."""
+class ClaudeBatchRecordOutput(BaseModel):
+    """Specific output record for Claude batch inference."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     recordId: str
-    modelInput: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest
-    modelOutput: ClaudeResponse | NovaResponse | None = None
-    error: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest | None = None
+    modelInput: ClaudeInvokeLLMRequest
+    modelOutput: ClaudeResponse | None = None
+    error: ClaudeInvokeLLMRequest | None = None
+
+
+class NovaBatchRecordOutput(BaseModel):
+    """Specific output record for Nova batch inference."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    recordId: str
+    modelInput: NovaInvokeLLMRequest
+    modelOutput: NovaResponse | None = None
+    error: NovaInvokeLLMRequest | None = None
 
 
 class BatchLLMResults(BaseModel):
     """All batch results model."""
 
-    responses: list[BatchRecordOutput]
+    responses: list[ClaudeBatchRecordOutput | NovaBatchRecordOutput]
 
 
 class S3InputDataConfig(BaseModel):
@@ -126,10 +139,15 @@ class BedrockBatchLLM(BaseModel):
         response = self.s3_client.get_object(Bucket=output_bucket, Key=final_output_key)
         response_body = response["Body"].read().decode("utf-8")
 
-        responses_list: list[BatchRecordOutput] = []
+        responses_list: list[ClaudeBatchRecordOutput | NovaBatchRecordOutput] = []
         for line in response_body.splitlines():
             if line.strip():
-                record_obj = BatchRecordOutput.model_validate_json(line)
+                if isinstance(self.llm, BedrockClaudeLLM):
+                    record_obj = ClaudeBatchRecordOutput.model_validate_json(line)
+                elif isinstance(self.llm, BedrockNovaLLM):
+                    record_obj = NovaBatchRecordOutput.model_validate_json(line)
+                else:
+                    raise NotImplementedError("Only support for Nova and Claude currently")
                 responses_list.append(record_obj)
 
         return BatchLLMResults(

@@ -171,6 +171,8 @@ class ClaudeUsageInfo(BaseModel):
 
     input_tokens: int
     output_tokens: int
+    cache_creation_input_tokens: int | None = None
+    cache_read_input_tokens: int | None = None
 
 
 class ClaudeResponse(BaseModel):
