@@ -112,7 +112,7 @@ class NovaInvokeLLMRequest(BaseModel):
     messages: list[NovaMessage] = Field(default_factory=list)
 
     inference_config: NovaInferenceConfig | None = Field(
-        default=None, serialization_alias="inferenceConfig"
+        default=None, serialization_alias="inferenceConfig", alias="inferenceConfig"
     )
 
 
@@ -202,7 +202,7 @@ class BedrockNovaLLM(LLM):
             messages = [*messages, LLMMessage(role="assistant", content=config.response_prefix)]
         return NovaInvokeLLMRequest(
             system=system,
-            inference_config=NovaInferenceConfig(
+            inferenceConfig=NovaInferenceConfig(
                 max_new_tokens=config.max_tokens,
                 temperature=config.temperature,
                 top_p=config.top_p,

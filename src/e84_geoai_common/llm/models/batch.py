@@ -3,13 +3,17 @@ from typing import Any, Self, cast
 
 import boto3
 from botocore.exceptions import ClientError
-from mypy_boto3_bedrock.client import BedrockClient
-from mypy_boto3_s3.client import S3Client
 from mypy_boto3_s3.literals import BucketLocationConstraintType
 from pydantic import BaseModel, ConfigDict, Field
 
 from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
-from e84_geoai_common.llm.models.claude import CLAUDE_BEDROCK_MODEL_IDS, BedrockClaudeLLM
+from e84_geoai_common.llm.models.claude import (
+    CLAUDE_BEDROCK_MODEL_IDS,
+    BedrockClaudeLLM,
+    ClaudeInvokeLLMRequest,
+    ClaudeResponse,
+)
+from e84_geoai_common.llm.models.nova import NovaInvokeLLMRequest, NovaResponse
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
@@ -19,19 +23,16 @@ class BatchRecordInput(BaseModel):
     """Single input record for batch inference."""
 
     recordId: str
-    # this could also be ClaudeInvokeLLMRequest | NovaInvokeLLMRequest (not Converse though)
-    modelInput: Any
+    modelInput: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest
 
 
 class BatchRecordOutput(BaseModel):
     """Single batch result model."""
 
     recordId: str
-    # This could also be ClaudeInvokeLLMRequest | NovaInvokeLLMRequest
-    modelInput: dict[str, Any]
-    # This could also be ClaudeResponse... etc.
-    modelOutput: dict[str, Any] | None = None
-    error: dict[str, Any] | None = None
+    modelInput: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest
+    modelOutput: ClaudeResponse | NovaResponse | None = None
+    error: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest | None = None
 
 
 class BatchLLMResults(BaseModel):
@@ -87,8 +88,8 @@ class BedrockBatchLLM(BaseModel):
             model_id=CLAUDE_BEDROCK_MODEL_IDS["Claude 3.5 Haiku"]
         )
     )
-    client: BedrockClient = Field(default_factory=lambda: boto3.client("bedrock"))  # type: ignore[reportUnknownMemberType]
-    s3_client: S3Client = Field(default_factory=lambda: boto3.client("s3"))  # type: ignore[reportUnknownMemberType]
+    client: Any = Field(default_factory=lambda: boto3.client("bedrock"))  # type: ignore[reportUnknownMemberType]
+    s3_client: Any = Field(default_factory=lambda: boto3.client("s3"))  # type: ignore[reportUnknownMemberType]
 
     def get_results(self: Self, job_arn: str) -> BatchLLMResults:
         """Returns the results of the job. Returns an error it is not done yet."""
@@ -108,15 +109,11 @@ class BedrockBatchLLM(BaseModel):
         input_data_config = job_details.get("inputDataConfig", {})
         s3_input_config = input_data_config.get("s3InputDataConfig", {})
         input_uri = s3_input_config.get("s3Uri")
-        if not input_uri:
-            raise ValueError("Input S3 URI not found.")
         input_filename = input_uri.split("/")[-1]
 
         output_data_config = job_details.get("outputDataConfig", {})
         s3_output_config = output_data_config.get("s3OutputDataConfig", {})
         output_uri = s3_output_config.get("s3Uri")
-        if not output_uri:
-            raise ValueError("Output S3 URI not found.")
         path_part = output_uri[5:]  # Remove s3://
         parts = path_part.split("/", 1)  # Split on first /
 
@@ -126,7 +123,6 @@ class BedrockBatchLLM(BaseModel):
             output_prefix_key = parts[1]
 
         final_output_key = f"{output_prefix_key}{job_id}/{input_filename}.out"
-
         response = self.s3_client.get_object(Bucket=output_bucket, Key=final_output_key)
         response_body = response["Body"].read().decode("utf-8")
 
@@ -191,7 +187,7 @@ class BedrockBatchLLM(BaseModel):
         inference_cfg: LLMInferenceConfig | None = None,
         *,
         create_buckets_if_missing: bool,
-    ) -> Job:
+    ) -> str:
         """Creates and invokes batch job."""
         # check to make sure that these parse and error check correctly
         input_bucket, input_bucket_key, output_bucket = self._parse_s3_urls(
@@ -228,21 +224,34 @@ class BedrockBatchLLM(BaseModel):
 
         # invoke with request
         response = self.client.create_model_invocation_job(**request.model_dump(exclude_none=True))
-        return Job(arn=response.get("jobArn"))
+        return response.get("jobArn")
 
     def _parse_s3_urls(
         self: Self, input_s3_file_url: str, output_s3_directory_url: str
     ) -> tuple[str, str, str]:
         """Return the bucket names and key(s) from an S3 URI."""
         if not input_s3_file_url.startswith("s3://") or not input_s3_file_url.startswith("s3://"):
-            raise ValueError("Invalid S3 URI; must start with 's3://'.")
+            msg = (
+                f"Invalid S3 URI {input_s3_file_url} or {output_s3_directory_url}."
+                f"Must start with 's3://'."
+            )
+            raise ValueError(msg)
         if input_s3_file_url.endswith("/"):
-            raise ValueError("Invalid Input S3 URI; must be a filename, but found a directory.")
+            msg = (
+                f"Invalid Input S3 URI {input_s3_file_url}. Must be a filename,"
+                "but found a directory."
+            )
+            raise ValueError(msg)
         if not output_s3_directory_url.endswith("/"):
-            raise ValueError("Invalid Output S3 URI; must be a directory, but found a filename.")
+            msg = (
+                f"Invalid Output S3 URI {output_s3_directory_url}. Must be a directory, but found a"
+                f"filename. Make sure there is a '/' at the end of the url."
+            )
+            raise ValueError(msg)
         input_parts = input_s3_file_url[5:].split("/", 1)
         if len(input_parts) <= 1:
-            raise ValueError("Invalid Input S3 URI; must have a file path")
+            msg = f"Invalid Input S3 URI {input_s3_file_url}. Must have a file path."
+            raise ValueError(msg)
         input_bucket = input_parts[0]
         input_key = input_parts[1]
 
@@ -282,7 +291,7 @@ class BedrockBatchLLM(BaseModel):
             msg = self.llm.create_request(messages=conversation, config=inference_config)  # type: ignore  # noqa: PGH003
             record = BatchRecordInput(
                 recordId=f"RECORD{i:010d}",
-                modelInput=msg,
+                modelInput=msg,  # type: ignore  # noqa: PGH003
             )
             input_requests.append(record)
         return input_requests
