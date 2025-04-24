@@ -19,8 +19,7 @@ dependencies = [
   "types-shapely>=2.0.0.20240820",
   "function_schema>=0.4.4",
   "rich",
-  "mypy-boto3-bedrock-runtime>=1.37.0",
-]
+  "mypy-boto3-bedrock-runtime>=1.37.0"]
 dynamic = ["version"]
 
 [tool.setuptools-git-versioning]
@@ -39,13 +38,13 @@ Github = "https://github.com/Element84/e84-geoai-common"
 debugging = ["folium>=0.17.0"]
 dev = [
   "pytest>=8.3.3",
+  "pytest-watch",
   "ipykernel>=6.29.5",
   "ruff>=0.6.8",
   "pyright>=1.1.381",
   "build>=1.2.2",
   "pre-commit>=3.8.0",
-  "pre-commit-hooks>=4.6.0",
-]
+  "pre-commit-hooks>=4.6.0"]
 
 
 [tool.pyright]
@@ -95,21 +94,19 @@ ignore = [
   'TRY003',
   'EM101',
   'EM102',
-  # TODO comment missing author
+  # TO DO comment missing author
   'TD002',
-  # TODO comment missing linked issue
+  # TO DO comment missing linked issue
   'TD003',
-  # TODO missing colon
-  'TD004'
-]
+  # TO DO missing colon
+  'TD004']
 
 [tool.ruff.lint.per-file-ignores]
 '__init__.py' = [
   # Module level import not at top of cell
   'E402',
   # Imported but unused
-  'F401',
-]
+  'F401']
 'tests/**/*' = [
   # Use of assert detected
   'S101',
@@ -120,5 +117,4 @@ ignore = [
   # Private member accessed
   'SLF001',
   # magic values
-  'PLR2004',
-]
+  'PLR2004']

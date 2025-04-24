@@ -6,15 +6,15 @@ appnope==0.1.4
     # via ipykernel
 asttokens==3.0.0
     # via stack-data
-boto3==1.37.29
+boto3==1.38.2
     # via e84-geoai-common (pyproject.toml)
-boto3-stubs==1.37.29
+boto3-stubs==1.38.2
     # via e84-geoai-common (pyproject.toml)
-botocore==1.37.29
+botocore==1.38.2
     # via
     #   boto3
     #   s3transfer
-botocore-stubs==1.37.29
+botocore-stubs==1.38.2
     # via boto3-stubs
 branca==0.8.1
     # via folium
@@ -26,14 +26,18 @@ cfgv==3.4.0
     # via pre-commit
 charset-normalizer==3.4.1
     # via requests
+colorama==0.4.6
+    # via pytest-watch
 comm==0.2.2
     # via ipykernel
-debugpy==1.8.13
+debugpy==1.8.14
     # via ipykernel
 decorator==5.2.1
     # via ipython
 distlib==0.3.9
     # via virtualenv
+docopt==0.6.2
+    # via pytest-watch
 executing==2.2.0
     # via stack-data
 filelock==3.18.0
@@ -42,7 +46,7 @@ folium==0.19.5
     # via e84-geoai-common (pyproject.toml)
 function-schema==0.4.5
     # via e84-geoai-common (pyproject.toml)
-identify==2.6.9
+identify==2.6.10
     # via pre-commit
 idna==3.10
     # via requests
@@ -80,7 +84,7 @@ matplotlib-inline==0.1.7
     #   ipython
 mdurl==0.1.2
     # via markdown-it-py
-mypy-boto3-bedrock-runtime==1.37.29
+mypy-boto3-bedrock-runtime==1.38.0
     # via
     #   e84-geoai-common (pyproject.toml)
     #   boto3-stubs
@@ -90,12 +94,12 @@ nodeenv==1.9.1
     # via
     #   pre-commit
     #   pyright
-numpy==2.2.4
+numpy==2.2.5
     # via
     #   folium
     #   shapely
     #   types-shapely
-packaging==24.2
+packaging==25.0
     # via
     #   build
     #   ipykernel
@@ -114,7 +118,7 @@ pre-commit==4.2.0
     # via e84-geoai-common (pyproject.toml)
 pre-commit-hooks==5.0.0
     # via e84-geoai-common (pyproject.toml)
-prompt-toolkit==3.0.50
+prompt-toolkit==3.0.51
     # via ipython
 psutil==7.0.0
     # via ipykernel
@@ -122,7 +126,7 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
-pydantic==2.11.2
+pydantic==2.11.3
     # via e84-geoai-common (pyproject.toml)
 pydantic-core==2.33.1
     # via pydantic
@@ -133,9 +137,13 @@ pygments==2.19.1
     #   rich
 pyproject-hooks==1.2.0
     # via build
-pyright==1.1.398
+pyright==1.1.400
     # via e84-geoai-common (pyproject.toml)
 pytest==8.3.5
+    # via
+    #   e84-geoai-common (pyproject.toml)
+    #   pytest-watch
+pytest-watch==4.2.0
     # via e84-geoai-common (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
@@ -155,9 +163,9 @@ ruamel-yaml==0.18.10
     # via pre-commit-hooks
 ruamel-yaml-clib==0.2.12
     # via ruamel-yaml
-ruff==0.11.4
+ruff==0.11.7
     # via e84-geoai-common (pyproject.toml)
-s3transfer==0.11.4
+s3transfer==0.12.0
     # via boto3
 shapely==2.1.0
     # via e84-geoai-common (pyproject.toml)
@@ -177,13 +185,13 @@ traitlets==5.14.3
     #   jupyter-client
     #   jupyter-core
     #   matplotlib-inline
-types-awscrt==0.25.7
+types-awscrt==0.26.1
     # via botocore-stubs
-types-s3transfer==0.11.4
+types-s3transfer==0.12.0
     # via boto3-stubs
-types-shapely==2.0.0.20250404
+types-shapely==2.1.0.20250418
     # via e84-geoai-common (pyproject.toml)
-typing-extensions==4.13.1
+typing-extensions==4.13.2
     # via
     #   pydantic
     #   pydantic-core
@@ -191,13 +199,15 @@ typing-extensions==4.13.1
     #   typing-inspection
 typing-inspection==0.4.0
     # via pydantic
-urllib3==2.3.0
+urllib3==2.4.0
     # via
     #   botocore
     #   requests
 virtualenv==20.30.0
     # via pre-commit
+watchdog==6.0.0
+    # via pytest-watch
 wcwidth==0.2.13
     # via prompt-toolkit
-xyzservices==2025.1.0
+xyzservices==2025.4.0
     # via folium

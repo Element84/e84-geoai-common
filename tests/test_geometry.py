@@ -1,10 +1,15 @@
 from math import cos, pi, sin
 
+import pytest
 from shapely import (
+    GeometryCollection,
+    LineString,
+    MultiLineString,
     MultiPolygon,
     Point,
     count_coordinates,
 )
+from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import Polygon
 from shapely.validation import explain_validity
 
@@ -12,6 +17,42 @@ from e84_geoai_common.geometry import (
     remove_extraneous_geom,
     simplify_geometry,
 )
+
+
+def generate_circle(
+    *, x: float = 0, y: float = 0, radius: float = 10, num_points: int = 10
+) -> Polygon:
+    angle = 2 * pi / num_points
+    points = [
+        (x + radius * cos(i * angle), y + radius * sin(i * angle)) for i in range(num_points - 1)
+    ]
+    return Polygon(points)
+
+
+def generate_line_string(
+    *,
+    start_point: Point = Point(0, 0),  # noqa: B008
+    end_point: Point = Point(10, 10),  # noqa: B008
+    num_points: int = 10,
+) -> LineString:
+    """Generates a line string with points between start and end."""
+    # Extract coordinates from the points
+    x1, y1 = start_point.x, start_point.y
+    x2, y2 = end_point.x, end_point.y
+
+    # Calculate step size for interpolation
+    x_step = (x2 - x1) / (num_points - 1) if num_points > 1 else 0
+    y_step = (y2 - y1) / (num_points - 1) if num_points > 1 else 0
+
+    # Generate the points along the line
+    points = [(x1 + (i * x_step), y1 + (i * y_step)) for i in range(num_points)]
+    return LineString(points)
+
+
+def assert_remove_extraneous_geom_value_error(g: BaseGeometry, max_points: int) -> None:
+    with pytest.raises(ValueError, match=r"Could not remove enough geometry parts"):
+        remove_extraneous_geom(g, max_points=max_points)
+
 
 # A simple diagram showing the geometry for the following test.
 #                A                     B              C
@@ -58,7 +99,8 @@ abc_multipolygon = MultiPolygon(
 )
 
 
-def test_remove_extraneous_geoms():
+def test_remove_extraneous_geoms_multipolygon():
+    # Tuples of max points to the expected geometry from the abc multipolygon
     expected_geoms = [
         (5, MultiPolygon([Polygon(a_exterior)])),
         (10, MultiPolygon([Polygon(a_exterior), Polygon(b_exterior)])),
@@ -117,12 +159,57 @@ def test_remove_extraneous_geoms():
         assert reduced.is_valid, explain_validity(reduced)
 
 
-def generate_circle(
-    *, x: float = 0, y: float = 0, radius: float = 10, num_points: int = 10
-) -> Polygon:
-    angle = 2 * pi / num_points
-    points = [(x + radius * cos(i * angle), y + radius * sin(i * angle)) for i in range(num_points)]
-    return Polygon(points)
+def test_remove_extraneous_geometry_simple():
+    # Point
+    assert remove_extraneous_geom(Point(0, 0), max_points=1) == Point(0, 0)
+    assert_remove_extraneous_geom_value_error(Point(0, 0), max_points=0)
+
+    # Line string
+    linestring = generate_line_string(
+        start_point=Point(0, 0), end_point=Point(10, 10), num_points=10
+    )
+
+    assert remove_extraneous_geom(linestring, max_points=11) == linestring
+    assert_remove_extraneous_geom_value_error(linestring, max_points=9)
+
+    # Polygon
+    polygon = generate_circle()
+    assert remove_extraneous_geom(polygon, max_points=11) == polygon
+    assert_remove_extraneous_geom_value_error(polygon, max_points=9)
+
+
+def test_remove_extraneous_geometry_misc():
+    line10 = generate_line_string(end_point=Point(10, 10), num_points=10)
+    line20 = generate_line_string(end_point=Point(20, 20), num_points=20)
+    line5 = generate_line_string(end_point=Point(5, 5), num_points=5)
+
+    # Multilinestring
+    mls = MultiLineString([line10, line20, line5])  # total 35
+    assert remove_extraneous_geom(mls, max_points=40) == mls
+    assert remove_extraneous_geom(mls, max_points=30) == MultiLineString([line20, line10])
+    assert remove_extraneous_geom(mls, max_points=20) == line20
+    # Removing the line20 but keeping the others would end up removing the larger area first
+    # which isn't what we want.
+    assert_remove_extraneous_geom_value_error(mls, max_points=19)
+
+    # Geometry collection
+    poly10 = generate_circle(radius=10, num_points=10)
+    poly20 = generate_circle(radius=20, num_points=20)
+    poly5 = generate_circle(radius=5, num_points=5)
+
+    gc = GeometryCollection([poly10, poly20, poly5, line10, line20, line5])  # total 70
+    assert remove_extraneous_geom(gc, max_points=70) == gc
+    assert remove_extraneous_geom(gc, max_points=65) == GeometryCollection(
+        [line20, line10, MultiPolygon([poly20, poly10, poly5])]
+    )
+    assert remove_extraneous_geom(gc, max_points=60) == GeometryCollection(
+        [line20, line10, MultiPolygon([poly20, poly10])]
+    )
+    assert remove_extraneous_geom(gc, max_points=40) == GeometryCollection(
+        [line20, MultiPolygon([poly20])]
+    )
+    assert remove_extraneous_geom(gc, max_points=30) == MultiPolygon([poly20])
+    assert_remove_extraneous_geom_value_error(gc, max_points=19)
 
 
 def test_simplify_geometry():

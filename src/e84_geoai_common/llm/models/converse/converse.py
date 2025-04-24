@@ -111,7 +111,7 @@ class ConverseInvokeLLMRequest(BaseModel):
     )
 
     messages: list[ConverseMessage] = Field(
-        default_factory=list, description="List of LLM Messages"
+        default_factory=list[ConverseMessage], description="List of LLM Messages"
     )
 
     system: Sequence[SystemContentBlock] | None = Field(default=None, description="System Prompt")

@@ -109,7 +109,7 @@ class NovaInvokeLLMRequest(BaseModel):
 
     system: list[NovaTextContent] | None = Field(default=None)
 
-    messages: list[NovaMessage] = Field(default_factory=list)
+    messages: list[NovaMessage] = Field(default_factory=list[NovaMessage])
 
     inference_config: NovaInferenceConfig | None = Field(
         default=None, serialization_alias="inferenceConfig"

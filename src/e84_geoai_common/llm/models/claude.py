@@ -135,7 +135,9 @@ class ClaudeInvokeLLMRequest(BaseModel):
 
     max_tokens: int = Field(default=1000, description="Maximum number of output tokens")
 
-    messages: list[ClaudeMessage] = Field(default_factory=list, description="List of LLM Messages")
+    messages: list[ClaudeMessage] = Field(
+        default_factory=list[ClaudeMessage], description="List of LLM Messages"
+    )
 
     stop_sequences: list[str] | None = None
 

@@ -7,7 +7,7 @@ repos:
         args: [
           src/,
           tests/,
-          # Ignore TODOs to allow them to be committed. They'll still fail the build though.
+          # Ignore TO DOs to allow them to be committed. They'll still fail the build though.
           --ignore, FIX002
         ]
         language: python

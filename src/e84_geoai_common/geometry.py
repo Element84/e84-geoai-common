@@ -66,7 +66,6 @@ def geometry_to_geojson(geom: BaseGeometry) -> str:
     return json.dumps(geom.__geo_interface__)
 
 
-# TODO test this
 def combine_geometry(geoms: list[BaseGeometry]) -> BaseGeometry:
     """Combines geometry into a single collection type."""
     if len(geoms) == 0:
@@ -108,7 +107,9 @@ class _GeomPart(BaseModel):
         if isinstance(geom, (Point, LinearRing, LineString)):
             return [_GeomPart(path=path, geom=geom)]
         if isinstance(geom, BaseMultipartGeometry):
-            geom_multi: BaseMultipartGeometry[BaseGeometry] = geom
+            geom_multi: BaseMultipartGeometry[BaseGeometry] = cast(
+                "BaseMultipartGeometry[BaseGeometry]", geom
+            )
             return [
                 metric
                 for idx, g in enumerate(geom_multi.geoms)
@@ -126,9 +127,10 @@ class _GeomPart(BaseModel):
 
 
 @timed_function
-def remove_extraneous_geom(geom: BaseGeometry, *, max_points: int) -> BaseGeometry:
-    """TODO docs."""
-    # TODO test this with other types beyond polygons
+def remove_extraneous_geom(geom: BaseGeometry, *, max_points: int) -> BaseGeometry:  # noqa: C901
+    """Provides an alternative for simplification that removes the smallest sub geometries."""
+    if count_coordinates(geom) <= max_points:
+        return geom
     metrics = sorted(_GeomPart.from_geometry(geom), key=lambda r: r.area, reverse=True)
 
     # A map of parent polygon paths to their rings
