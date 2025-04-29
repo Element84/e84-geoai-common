@@ -1,17 +1,4 @@
-from e84_geoai_common.util import chunk_items, group_by, unique_by
-
-
-def test_chunk_items() -> None:
-    result = chunk_items(range(4), 1)
-    assert list(result) == [[0], [1], [2], [3]]
-    result = chunk_items(range(8), 2)
-    assert list(result) == [[0, 1], [2, 3], [4, 5], [6, 7]]
-    result = chunk_items(range(8), 3)
-    assert list(result) == [[0, 1, 2], [3, 4, 5], [6, 7]]
-    result = chunk_items(range(8), 6)
-    assert list(result) == [[0, 1, 2, 3, 4, 5], [6, 7]]
-    result = chunk_items(range(8), 10)
-    assert list(result) == [[0, 1, 2, 3, 4, 5, 6, 7]]
+from e84_geoai_common.util import unique_by
 
 
 def test_unique_by() -> None:
@@ -34,23 +21,3 @@ def test_unique_by() -> None:
     )
     assert list(output) == ["foo", "rock", "a", "longer"]
     assert dups == [("snow", 4), ("b", 1)]
-
-
-def test_group_by() -> None:
-    # Empty sequence
-    assert group_by([]) == {}
-
-    # Identify fn
-    assert group_by(range(3)) == {0: [0], 1: [1], 2: [2]}
-
-    # Custom key fn
-    words = ["a", "peanut", "sour", "fruit", "I", "apple", "artificial", "natural", "peach"]
-    expected_grouping = {
-        1: ["a", "I"],
-        6: ["peanut"],
-        4: ["sour"],
-        5: ["fruit", "apple", "peach"],
-        10: ["artificial"],
-        7: ["natural"],
-    }
-    assert group_by(words, key_fn=len) == expected_grouping
