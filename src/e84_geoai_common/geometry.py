@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import shapely
 import shapely.geometry
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from shapely import (
     GeometryCollection,
     LinearRing,
@@ -84,15 +84,23 @@ def combine_geometry(geoms: list[BaseGeometry]) -> BaseGeometry:
 
 
 class _GeomPart(BaseModel):
+    """Represents a geometry object that's part of a larger geometry collection or polygon."""
+
     model_config = ConfigDict(
         strict=True, frozen=True, extra="forbid", arbitrary_types_allowed=True
     )
-    path: list[int]
+
+    path: list[int] = Field(
+        description="a list of indexes into the parent geometry where this resides"
+    )
     geom: BaseGeometry
-    is_polygon_part: bool = False
+    is_polygon_part: bool = Field(
+        default=False, description="Inidicates if this geometry is a part of a polygon."
+    )
 
     @cached_property
     def area(self) -> float:
+        """A simplified square degree area of the bounding box of the geometry."""
         minx, miny, maxx, maxy = self.geom.bounds
         return (maxx - minx) * (maxy - miny)
 
@@ -102,6 +110,7 @@ class _GeomPart(BaseModel):
 
     @staticmethod
     def from_geometry(geom: BaseGeometry, path: list[int] | None = None) -> "list[_GeomPart]":
+        """Recursively converts a geometry into it's list of child geometry parts."""
         if path is None:
             path = []
         if isinstance(geom, (Point, LinearRing, LineString)):
@@ -128,18 +137,31 @@ class _GeomPart(BaseModel):
 
 @timed_function
 def remove_extraneous_geom(geom: BaseGeometry, *, max_points: int) -> BaseGeometry:  # noqa: C901
-    """Provides an alternative for simplification that removes the smallest sub geometries."""
-    if count_coordinates(geom) <= max_points:
-        return geom
-    metrics = sorted(_GeomPart.from_geometry(geom), key=lambda r: r.area, reverse=True)
+    """Provides an alternative for simplification that removes the smallest sub geometries.
 
-    # A map of parent polygon paths to their rings
+    For geometries that are collections of other geometries like MultiPolygons or GeometryCollection
+    or Polygons with holes this provides a way to simplify geometries by removing the child
+    component geometries that are the smallest by area. Normal simplification works by removing
+    redundant points but that can only go so far, for example, when trying to simplify a
+    GeometryCollection which contains hundreds of polygons with multiple holes.
+    """
+    if count_coordinates(geom) <= max_points:
+        # No reduction is needed
+        return geom
+    # Converts the geometry into a list of geometry parts sorted by area largest to smallest.
+    parts = sorted(_GeomPart.from_geometry(geom), key=lambda r: r.area, reverse=True)
+
+    # The two sets of geometries being collected to return that are under the count of max_points.
+    # - A map of parent polygon paths to their rings.
     poly_rings: dict[tuple[int, ...], tuple[LinearRing, list[LinearRing]]] = {}
+    # - Any geometry that's not a polygon
     other_geoms: list[BaseGeometry] = []
+    # - The number of points in poly_rings and other_geoms
     num_points = 0
-    for metric in metrics:
+
+    for metric in parts:
         if num_points + metric.num_points > max_points:
-            # This area will exceed the number of points
+            # This area will exceed the number of points. Breaking to return the resulting geometry
             break
         if metric.is_polygon_part:
             parent_poly_path = tuple(metric.path[0:-1])
@@ -164,6 +186,7 @@ def remove_extraneous_geom(geom: BaseGeometry, *, max_points: int) -> BaseGeomet
             f"Could not remove enough geometry parts to get below max points [{max_points}]"
         )
 
+    # Compose the parts from other_geoms and poly_rings into a single geometry.
     geoms_to_combine = other_geoms
 
     # Construct the most specific type
