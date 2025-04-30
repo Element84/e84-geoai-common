@@ -14,7 +14,7 @@ from shapely.geometry.polygon import Polygon
 from shapely.validation import explain_validity
 
 from e84_geoai_common.geometry import (
-    remove_extraneous_geom,
+    remove_extraneous_geoms,
     simplify_geometry,
 )
 
@@ -51,7 +51,7 @@ def generate_line_string(
 
 def assert_remove_extraneous_geom_value_error(g: BaseGeometry, max_points: int) -> None:
     with pytest.raises(ValueError, match=r"Could not remove enough geometry parts"):
-        remove_extraneous_geom(g, max_points=max_points)
+        remove_extraneous_geoms(g, max_points=max_points)
 
 
 # A simple diagram showing the geometry for the following test.
@@ -154,14 +154,14 @@ def test_remove_extraneous_geoms_multipolygon():
         ),
     ]
     for max_points, expected in expected_geoms:
-        reduced = remove_extraneous_geom(abc_multipolygon, max_points=max_points)
+        reduced = remove_extraneous_geoms(abc_multipolygon, max_points=max_points)
         assert reduced == expected
         assert reduced.is_valid, explain_validity(reduced)
 
 
 def test_remove_extraneous_geometry_simple():
     # Point
-    assert remove_extraneous_geom(Point(0, 0), max_points=1) == Point(0, 0)
+    assert remove_extraneous_geoms(Point(0, 0), max_points=1) == Point(0, 0)
     assert_remove_extraneous_geom_value_error(Point(0, 0), max_points=0)
 
     # Line string
@@ -169,12 +169,12 @@ def test_remove_extraneous_geometry_simple():
         start_point=Point(0, 0), end_point=Point(10, 10), num_points=10
     )
 
-    assert remove_extraneous_geom(linestring, max_points=11) == linestring
+    assert remove_extraneous_geoms(linestring, max_points=11) == linestring
     assert_remove_extraneous_geom_value_error(linestring, max_points=9)
 
     # Polygon
     polygon = generate_circle()
-    assert remove_extraneous_geom(polygon, max_points=11) == polygon
+    assert remove_extraneous_geoms(polygon, max_points=11) == polygon
     assert_remove_extraneous_geom_value_error(polygon, max_points=9)
 
 
@@ -185,9 +185,9 @@ def test_remove_extraneous_geometry_misc():
 
     # Multilinestring
     mls = MultiLineString([line10, line20, line5])  # total 35
-    assert remove_extraneous_geom(mls, max_points=40) == mls
-    assert remove_extraneous_geom(mls, max_points=30) == MultiLineString([line20, line10])
-    assert remove_extraneous_geom(mls, max_points=20) == line20
+    assert remove_extraneous_geoms(mls, max_points=40) == mls
+    assert remove_extraneous_geoms(mls, max_points=30) == MultiLineString([line20, line10])
+    assert remove_extraneous_geoms(mls, max_points=20) == line20
     # Removing the line20 but keeping the others would end up removing the larger area first
     # which isn't what we want.
     assert_remove_extraneous_geom_value_error(mls, max_points=19)
@@ -198,17 +198,17 @@ def test_remove_extraneous_geometry_misc():
     poly5 = generate_circle(radius=5, num_points=5)
 
     gc = GeometryCollection([poly10, poly20, poly5, line10, line20, line5])  # total 70
-    assert remove_extraneous_geom(gc, max_points=70) == gc
-    assert remove_extraneous_geom(gc, max_points=65) == GeometryCollection(
+    assert remove_extraneous_geoms(gc, max_points=70) == gc
+    assert remove_extraneous_geoms(gc, max_points=65) == GeometryCollection(
         [line20, line10, MultiPolygon([poly20, poly10, poly5])]
     )
-    assert remove_extraneous_geom(gc, max_points=60) == GeometryCollection(
+    assert remove_extraneous_geoms(gc, max_points=60) == GeometryCollection(
         [line20, line10, MultiPolygon([poly20, poly10])]
     )
-    assert remove_extraneous_geom(gc, max_points=40) == GeometryCollection(
+    assert remove_extraneous_geoms(gc, max_points=40) == GeometryCollection(
         [line20, MultiPolygon([poly20])]
     )
-    assert remove_extraneous_geom(gc, max_points=30) == MultiPolygon([poly20])
+    assert remove_extraneous_geoms(gc, max_points=30) == MultiPolygon([poly20])
     assert_remove_extraneous_geom_value_error(gc, max_points=19)
 
 

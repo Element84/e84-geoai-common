@@ -136,7 +136,7 @@ class _GeomPart(BaseModel):
 
 
 @timed_function
-def remove_extraneous_geom(geom: BaseGeometry, *, max_points: int) -> BaseGeometry:  # noqa: C901
+def remove_extraneous_geoms(geom: BaseGeometry, *, max_points: int) -> BaseGeometry:  # noqa: C901
     """Provides an alternative for simplification that removes the smallest sub geometries.
 
     For geometries that are collections of other geometries like MultiPolygons or GeometryCollection
@@ -241,7 +241,7 @@ def simplify_geometry(geom: BaseGeometry, max_points: int = 3_000) -> BaseGeomet
             return simplified
     # If it made it this far then normal simplification won't work. Switch to dropping sub
     # geometries to further simplify it.
-    return remove_extraneous_geom(simplified, max_points=max_points)
+    return remove_extraneous_geoms(simplified, max_points=max_points)
 
 
 def BoundingBox(  # noqa: N802
