@@ -61,7 +61,7 @@ class NovaImageContent(BaseModel):
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
-        img_format: NovaImageFormat = cast(NovaImageFormat, image.media_type.split("/")[-1])
+        img_format: NovaImageFormat = cast("NovaImageFormat", image.media_type.split("/")[-1])
         return cls(
             image=NovaImageInnerContent(
                 format=img_format,
@@ -71,7 +71,7 @@ class NovaImageContent(BaseModel):
 
     def to_b64_image_content(self) -> Base64ImageContent:
         media_type: LLMMediaType = cast(
-            LLMMediaType,
+            "LLMMediaType",
             f"image/{self.image.format}",
         )
         return Base64ImageContent(
@@ -109,7 +109,7 @@ class NovaInvokeLLMRequest(BaseModel):
 
     system: list[NovaTextContent] | None = Field(default=None)
 
-    messages: list[NovaMessage] = Field(default_factory=list)
+    messages: list[NovaMessage] = Field(default_factory=list[NovaMessage])
 
     inference_config: NovaInferenceConfig | None = Field(
         default=None, serialization_alias="inferenceConfig"

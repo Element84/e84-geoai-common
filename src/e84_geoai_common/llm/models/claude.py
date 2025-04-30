@@ -135,7 +135,9 @@ class ClaudeInvokeLLMRequest(BaseModel):
 
     max_tokens: int = Field(default=1000, description="Maximum number of output tokens")
 
-    messages: list[ClaudeMessage] = Field(default_factory=list, description="List of LLM Messages")
+    messages: list[ClaudeMessage] = Field(
+        default_factory=list[ClaudeMessage], description="List of LLM Messages"
+    )
 
     stop_sequences: list[str] | None = None
 
@@ -221,7 +223,7 @@ def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
     injected into the tool's description so that the LLM is aware of it.
     """
     if tool.input_model is None:
-        input_schema = cast(dict[str, Any], {"type": "object", "properties": {}})
+        input_schema = cast("dict[str, Any]", {"type": "object", "properties": {}})
     else:
         input_schema = tool.input_model.model_json_schema()
 

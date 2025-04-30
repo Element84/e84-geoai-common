@@ -70,13 +70,15 @@ class ConverseImageContent(BaseModel):
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
-        img_format: ConverseImageFormat = cast(ConverseImageFormat, image.media_type.split("/")[-1])
+        img_format: ConverseImageFormat = cast(
+            "ConverseImageFormat", image.media_type.split("/")[-1]
+        )
         source = ConverseImageSource(bytes=base64.b64decode(image.data))
         return cls(image=ConverseImageBlock(format=img_format, source=source))
 
     def to_b64_image_content(self) -> Base64ImageContent:
         media_type: LLMMediaType = cast(
-            LLMMediaType,
+            "LLMMediaType",
             f"image/{self.image.format}",
         )
         return Base64ImageContent(

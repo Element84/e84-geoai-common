@@ -111,7 +111,7 @@ class ConverseInvokeLLMRequest(BaseModel):
     )
 
     messages: list[ConverseMessage] = Field(
-        default_factory=list, description="List of LLM Messages"
+        default_factory=list[ConverseMessage], description="List of LLM Messages"
     )
 
     system: Sequence[SystemContentBlock] | None = Field(default=None, description="System Prompt")
@@ -153,7 +153,7 @@ def _llm_tool_to_converse_tool(tool: LLMTool) -> ConverseSingleTool:
     injected into the tool's description so that the LLM is aware of it.
     """
     if tool.input_model is None:
-        input_schema = cast(dict[str, Any], {"type": "object", "properties": {}})
+        input_schema = cast("dict[str, Any]", {"type": "object", "properties": {}})
     else:
         input_schema = tool.input_model.model_json_schema()
 

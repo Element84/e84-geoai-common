@@ -4,7 +4,12 @@ repos:
       - id: ruff-check
         name: Run ruff check
         entry: ruff check
-        args: [src/, tests/]
+        args: [
+          src/,
+          tests/,
+          # Ignore TO DOs to allow them to be committed. They'll still fail the build though.
+          --ignore, FIX002
+        ]
         language: python
         types_or: [python, pyi]
         pass_filenames: true
