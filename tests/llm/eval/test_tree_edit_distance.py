@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, field_serializer
 from shapely import Point
 from shapely.geometry.base import BaseGeometry
 
-from e84_geoai_common.llm.eval.tree_distance import (
+from e84_geoai_common.llm.eval.tree_edit_distance import (
     get_tree_edit_distance,
     tree_to_markdown,
 )
