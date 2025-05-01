@@ -38,6 +38,7 @@ CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude Instant": "us.anthropic.claude-instant-v1",
     "Claude 3.5 Haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
     "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "Claude 3.7 Sonnet": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
 }
 
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
@@ -134,7 +135,9 @@ class ClaudeInvokeLLMRequest(BaseModel):
 
     max_tokens: int = Field(default=1000, description="Maximum number of output tokens")
 
-    messages: list[ClaudeMessage] = Field(default_factory=list, description="List of LLM Messages")
+    messages: list[ClaudeMessage] = Field(
+        default_factory=list[ClaudeMessage], description="List of LLM Messages"
+    )
 
     stop_sequences: list[str] | None = None
 
@@ -220,7 +223,7 @@ def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
     injected into the tool's description so that the LLM is aware of it.
     """
     if tool.input_model is None:
-        input_schema = cast(dict[str, Any], {"type": "object", "properties": {}})
+        input_schema = cast("dict[str, Any]", {"type": "object", "properties": {}})
     else:
         input_schema = tool.input_model.model_json_schema()
 

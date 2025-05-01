@@ -1,9 +1,8 @@
 from time import sleep
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import boto3
 from botocore.exceptions import ClientError
-from mypy_boto3_s3.literals import BucketLocationConstraintType
 from pydantic import BaseModel, ConfigDict, Field
 
 from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
@@ -14,6 +13,9 @@ from e84_geoai_common.llm.models.claude import (
     ClaudeResponse,
 )
 from e84_geoai_common.llm.models.nova import BedrockNovaLLM, NovaInvokeLLMRequest, NovaResponse
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.literals import BucketLocationConstraintType
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
@@ -288,7 +290,7 @@ class BedrockBatchLLM(BaseModel):
                 if region == "us-east-1":
                     self.s3_client.create_bucket(Bucket=bucket)
                 else:
-                    region = cast(BucketLocationConstraintType, region)
+                    region = cast("BucketLocationConstraintType", region)
                     self.s3_client.create_bucket(
                         Bucket=bucket,
                         CreateBucketConfiguration={"LocationConstraint": region},

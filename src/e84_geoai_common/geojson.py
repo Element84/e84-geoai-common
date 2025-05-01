@@ -38,7 +38,7 @@ class Feature(BaseModel, Generic[T]):
     @classmethod
     def _parse_shapely_geometry(cls, d: Any) -> BaseGeometry:  # noqa: ANN401
         if isinstance(d, dict):
-            return geometry_from_geojson_dict(cast(dict[str, Any], d))
+            return geometry_from_geojson_dict(cast("dict[str, Any]", d))
         if isinstance(d, BaseGeometry):
             return d
         msg = "geometry must be a geojson feature dictionary or a shapely geometry."
