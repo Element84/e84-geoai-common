@@ -7,12 +7,15 @@ appnope==0.1.4
 asttokens==3.0.0
     # via stack-data
 boto3==1.37.6
-    # via e84-geoai-common (pyproject.toml)
+    # via
+    #   e84-geoai-common (pyproject.toml)
+    #   moto
 boto3-stubs==1.37.6
     # via e84-geoai-common (pyproject.toml)
 botocore==1.37.6
     # via
     #   boto3
+    #   moto
     #   s3transfer
 botocore-stubs==1.37.4
     # via boto3-stubs
@@ -22,12 +25,16 @@ build==1.2.2.post1
     # via e84-geoai-common (pyproject.toml)
 certifi==2025.1.31
     # via requests
+cffi==1.17.1
+    # via cryptography
 cfgv==3.4.0
     # via pre-commit
 charset-normalizer==3.4.1
     # via requests
 comm==0.2.2
     # via ipykernel
+cryptography==44.0.2
+    # via moto
 debugpy==1.8.13
     # via ipykernel
 decorator==5.2.1
@@ -60,6 +67,7 @@ jinja2==3.1.5
     # via
     #   branca
     #   folium
+    #   moto
 jmespath==1.0.1
     # via
     #   boto3
@@ -73,17 +81,23 @@ jupyter-core==5.7.2
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
-    # via jinja2
+    # via
+    #   jinja2
+    #   werkzeug
 matplotlib-inline==0.1.7
     # via
     #   ipykernel
     #   ipython
 mdurl==0.1.2
     # via markdown-it-py
+moto==5.1.4
+    # via e84-geoai-common (pyproject.toml)
 mypy-boto3-bedrock==1.37.29
     # via boto3-stubs
 mypy-boto3-bedrock-runtime==1.37.0
-    # via boto3-stubs
+    # via
+    #   e84-geoai-common (pyproject.toml)
+    #   boto3-stubs
 mypy-boto3-s3==1.37.24
     # via boto3-stubs
 nest-asyncio==1.6.0
@@ -124,6 +138,10 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
+py-partiql-parser==0.6.1
+    # via moto
+pycparser==2.22
+    # via cffi
 pydantic==2.10.6
     # via e84-geoai-common (pyproject.toml)
 pydantic-core==2.27.2
@@ -143,14 +161,23 @@ python-dateutil==2.9.0.post0
     # via
     #   botocore
     #   jupyter-client
+    #   moto
 pyyaml==6.0.2
-    # via pre-commit
+    # via
+    #   moto
+    #   pre-commit
+    #   responses
 pyzmq==26.2.1
     # via
     #   ipykernel
     #   jupyter-client
 requests==2.32.3
-    # via folium
+    # via
+    #   folium
+    #   moto
+    #   responses
+responses==0.25.7
+    # via moto
 rich==13.9.4
     # via e84-geoai-common (pyproject.toml)
 ruamel-yaml==0.18.10
@@ -194,9 +221,14 @@ urllib3==2.3.0
     # via
     #   botocore
     #   requests
+    #   responses
 virtualenv==20.29.2
     # via pre-commit
 wcwidth==0.2.13
     # via prompt-toolkit
+werkzeug==3.1.3
+    # via moto
+xmltodict==0.14.2
+    # via moto
 xyzservices==2025.1.0
     # via folium
