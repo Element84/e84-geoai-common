@@ -51,6 +51,8 @@ def s3_moto_client():
     if not USE_REAL_BATCH_BEDROCK_CLIENT:
         with mock_aws():
             yield
+    else:
+        yield
 
 
 def batch_claude_output_example(question: str, content: str, lines: int = 5) -> str:
