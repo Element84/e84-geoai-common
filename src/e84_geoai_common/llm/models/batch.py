@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from time import sleep
 from typing import TYPE_CHECKING, Any, Self, cast
 
@@ -5,7 +6,7 @@ import boto3
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, ConfigDict, Field
 
-from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
+from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage
 from e84_geoai_common.llm.models.claude import (
     CLAUDE_BEDROCK_MODEL_IDS,
     BedrockClaudeLLM,
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
+
+ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
 
 
 class BatchRecordInput(BaseModel):
@@ -50,10 +53,19 @@ class NovaBatchRecordOutput(BaseModel):
     error: NovaInvokeLLMRequest | None = None
 
 
+BatchLLMResponseTypes = ClaudeBatchRecordOutput | NovaBatchRecordOutput
+BatchLLMResponsesTypes = Sequence[ClaudeBatchRecordOutput] | Sequence[NovaBatchRecordOutput]
+
+LLM_TO_OUTPUT_MAP: dict[type[ValidBatchLLMs], type[BatchLLMResponseTypes]] = {
+    BedrockClaudeLLM: ClaudeBatchRecordOutput,
+    BedrockNovaLLM: NovaBatchRecordOutput,
+}
+
+
 class BatchLLMResults(BaseModel):
     """All batch results model."""
 
-    responses: list[ClaudeBatchRecordOutput | NovaBatchRecordOutput]
+    responses: BatchLLMResponsesTypes
 
 
 class S3InputDataConfig(BaseModel):
@@ -90,15 +102,11 @@ class BatchLLMRequest(BaseModel):
     outputDataConfig: OutputDataConfig
 
 
-class Job(BaseModel):
-    arn: str
-
-
 class BedrockBatchLLM(BaseModel):
     # LLM is an abstract, non-pydantic field. arbitrary_types_allowed is needed or else it errors.
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    llm: LLM = Field(
+    llm: ValidBatchLLMs = Field(
         default_factory=lambda: BedrockClaudeLLM(
             model_id=CLAUDE_BEDROCK_MODEL_IDS["Claude 3.5 Haiku"]
         )
@@ -138,22 +146,26 @@ class BedrockBatchLLM(BaseModel):
             output_prefix_key = parts[1]
 
         final_output_key = f"{output_prefix_key}{job_id}/{input_filename}.out"
-        response = self.s3_client.get_object(Bucket=output_bucket, Key=final_output_key)
+        llm_instance_type = type(self.llm)
+        record_output_model = LLM_TO_OUTPUT_MAP[llm_instance_type]
+        return self._validate_results(record_output_model, output_bucket, final_output_key)
+
+    def _validate_results(
+        self,
+        response_model: type[BatchLLMResponseTypes],
+        output_bucket: str,
+        key: str,
+    ) -> BatchLLMResults:
+        response = self.s3_client.get_object(Bucket=output_bucket, Key=key)
         response_body = response["Body"].read().decode("utf-8")
 
-        responses_list: list[ClaudeBatchRecordOutput | NovaBatchRecordOutput] = []
+        responses_list: list[BaseModel] = []
         for line in response_body.splitlines():
-            if line.strip():
-                if isinstance(self.llm, BedrockClaudeLLM):
-                    record_obj = ClaudeBatchRecordOutput.model_validate_json(line)
-                elif isinstance(self.llm, BedrockNovaLLM):
-                    record_obj = NovaBatchRecordOutput.model_validate_json(line)
-                else:
-                    raise NotImplementedError("Only support for Nova and Claude currently")
-                responses_list.append(record_obj)
-
+            record_obj = response_model.model_validate_json(line)
+            responses_list.append(record_obj)
+        casted_responses = cast("BatchLLMResponsesTypes", responses_list)
         return BatchLLMResults(
-            responses=responses_list,
+            responses=casted_responses,
         )
 
     def wait_for_job_to_finish(self: Self, job_arn: str) -> None:
@@ -307,11 +319,10 @@ class BedrockBatchLLM(BaseModel):
     ) -> list[BatchRecordInput]:
         input_requests: list[BatchRecordInput] = []
         for i, conversation in enumerate(conversations):
-            # create_request isn't recognized
-            msg = self.llm.create_request(messages=conversation, config=inference_config)  # type: ignore  # noqa: PGH003
+            msg = self.llm.create_request(messages=conversation, config=inference_config)
             record = BatchRecordInput(
                 recordId=f"RECORD{i:010d}",
-                modelInput=msg,  # type: ignore  # noqa: PGH003
+                modelInput=msg,
             )
             input_requests.append(record)
         return input_requests

@@ -119,4 +119,6 @@ ignore = [
   # Private member accessed
   'SLF001',
   # magic values
-  'PLR2004']
+  'PLR2004',
+  #unused parameters
+  'ARG001']
