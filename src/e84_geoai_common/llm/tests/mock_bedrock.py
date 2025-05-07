@@ -88,6 +88,16 @@ def converse_response_with_content(
     return out
 
 
+def llama_response_with_content(text: str) -> dict[str, Any]:
+    """Creates a mock Llama response with the given text."""
+    return {
+        "generation": text,
+        "prompt_token_count": 50,
+        "generation_token_count": 50,
+        "stop_reason": "stop",
+    }
+
+
 class _MockBedrockRuntimeClient(BedrockRuntimeClient):
     """Implements the bedrock runtime client to return a set of canned responses."""
 

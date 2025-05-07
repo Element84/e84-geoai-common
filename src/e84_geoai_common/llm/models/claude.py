@@ -193,7 +193,7 @@ class ClaudeResponse(BaseModel):
     usage: ClaudeUsageInfo
 
 
-def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
+def _llm_message_to_claude_message(msg: LLMMessage) -> ClaudeMessage:
     """Converts the generic LLM Message into a ClaudeMessage."""
 
     def _handle_content(content: LLMMessageContentType) -> ClaudeMessageContentType:
