@@ -1,14 +1,15 @@
 from collections.abc import Sequence
 from time import sleep
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import Generic, Self, TypeVar, cast
 
-import boto3
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, ConfigDict, Field
+from mypy_boto3_bedrock import BedrockClient
+from mypy_boto3_s3 import S3Client
+from mypy_boto3_s3.literals import BucketLocationConstraintType
+from pydantic import BaseModel, ConfigDict
 
 from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage
 from e84_geoai_common.llm.models.claude import (
-    CLAUDE_BEDROCK_MODEL_IDS,
     BedrockClaudeLLM,
     ClaudeInvokeLLMRequest,
     ClaudeResponse,
@@ -29,6 +30,21 @@ class BatchRecordInput(BaseModel):
 
     recordId: str
     modelInput: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest
+
+
+RequestModel = TypeVar("RequestModel", bound=BaseModel)
+ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
+
+
+class BatchRecordOutput(BaseModel, Generic[RequestModel, ResponseModel]):
+    """Specific output record for Claude batch inference."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    recordId: str
+    modelInput: RequestModel
+    modelOutput: ResponseModel | None = None
+    error: RequestModel | None = None
 
 
 class ClaudeBatchRecordOutput(BaseModel):
@@ -65,7 +81,7 @@ LLM_TO_OUTPUT_MAP: dict[type[ValidBatchLLMs], type[BatchLLMResponseTypes]] = {
 class BatchLLMResults(BaseModel):
     """All batch results model."""
 
-    responses: BatchLLMResponsesTypes
+    responses: Sequence[LLMMessage]
 
 
 class S3InputDataConfig(BaseModel):
@@ -102,17 +118,19 @@ class BatchLLMRequest(BaseModel):
     outputDataConfig: OutputDataConfig
 
 
-class BedrockBatchLLM(BaseModel):
-    # LLM is an abstract, non-pydantic field. arbitrary_types_allowed is needed or else it errors.
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    llm: ValidBatchLLMs = Field(
-        default_factory=lambda: BedrockClaudeLLM(
-            model_id=CLAUDE_BEDROCK_MODEL_IDS["Claude 3.5 Haiku"]
-        )
-    )
-    client: Any = Field(default_factory=lambda: boto3.client("bedrock"))  # type: ignore[reportUnknownMemberType]
-    s3_client: Any = Field(default_factory=lambda: boto3.client("s3"))  # type: ignore[reportUnknownMemberType]
+class BedrockBatchLLM:
+    def __init__(
+        self,
+        llm: ValidBatchLLMs,
+        request_model: type[BaseModel],
+        response_model: type[BaseModel],
+        client: BedrockClient,
+        s3_client: S3Client,
+    ):
+        self.llm = llm
+        self.client = client
+        self.s3_client = s3_client
+        self.batch_record_output_model = BatchRecordOutput[request_model, response_model]
 
     def get_results(self: Self, job_arn: str) -> BatchLLMResults:
         """Returns the results of the job. Returns an error it is not done yet."""
