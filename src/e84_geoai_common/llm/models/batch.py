@@ -1,20 +1,14 @@
-from collections.abc import Sequence
 from time import sleep
-from typing import Generic, Self, TypeVar, cast
+from typing import TYPE_CHECKING, Self, cast
 
 from botocore.exceptions import ClientError
 from mypy_boto3_bedrock import BedrockClient
 from mypy_boto3_s3 import S3Client
-from mypy_boto3_s3.literals import BucketLocationConstraintType
 from pydantic import BaseModel, ConfigDict
 
 from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage
-from e84_geoai_common.llm.models.claude import (
-    BedrockClaudeLLM,
-    ClaudeInvokeLLMRequest,
-    ClaudeResponse,
-)
-from e84_geoai_common.llm.models.nova import BedrockNovaLLM, NovaInvokeLLMRequest, NovaResponse
+from e84_geoai_common.llm.models.claude import BedrockClaudeLLM
+from e84_geoai_common.llm.models.nova import BedrockNovaLLM
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.literals import BucketLocationConstraintType
@@ -25,18 +19,14 @@ if TYPE_CHECKING:
 ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
 
 
-class BatchRecordInput(BaseModel):
+class BatchRecordInput[RequestModel: BaseModel](BaseModel):
     """Single input record for batch inference."""
 
     recordId: str
-    modelInput: ClaudeInvokeLLMRequest | NovaInvokeLLMRequest
+    modelInput: RequestModel
 
 
-RequestModel = TypeVar("RequestModel", bound=BaseModel)
-ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
-
-
-class BatchRecordOutput(BaseModel, Generic[RequestModel, ResponseModel]):
+class BatchRecordOutput[RequestModel: BaseModel, ResponseModel: BaseModel](BaseModel):
     """Specific output record for Claude batch inference."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -45,43 +35,6 @@ class BatchRecordOutput(BaseModel, Generic[RequestModel, ResponseModel]):
     modelInput: RequestModel
     modelOutput: ResponseModel | None = None
     error: RequestModel | None = None
-
-
-class ClaudeBatchRecordOutput(BaseModel):
-    """Specific output record for Claude batch inference."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    recordId: str
-    modelInput: ClaudeInvokeLLMRequest
-    modelOutput: ClaudeResponse | None = None
-    error: ClaudeInvokeLLMRequest | None = None
-
-
-class NovaBatchRecordOutput(BaseModel):
-    """Specific output record for Nova batch inference."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    recordId: str
-    modelInput: NovaInvokeLLMRequest
-    modelOutput: NovaResponse | None = None
-    error: NovaInvokeLLMRequest | None = None
-
-
-BatchLLMResponseTypes = ClaudeBatchRecordOutput | NovaBatchRecordOutput
-BatchLLMResponsesTypes = Sequence[ClaudeBatchRecordOutput] | Sequence[NovaBatchRecordOutput]
-
-LLM_TO_OUTPUT_MAP: dict[type[ValidBatchLLMs], type[BatchLLMResponseTypes]] = {
-    BedrockClaudeLLM: ClaudeBatchRecordOutput,
-    BedrockNovaLLM: NovaBatchRecordOutput,
-}
-
-
-class BatchLLMResults(BaseModel):
-    """All batch results model."""
-
-    responses: Sequence[LLMMessage]
 
 
 class S3InputDataConfig(BaseModel):
@@ -118,27 +71,31 @@ class BatchLLMRequest(BaseModel):
     outputDataConfig: OutputDataConfig
 
 
-class BedrockBatchLLM:
+class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
     def __init__(
         self,
         llm: ValidBatchLLMs,
-        request_model: type[BaseModel],
-        response_model: type[BaseModel],
+        request_model: type[RequestModel],
+        response_model: type[ResponseModel],
         client: BedrockClient,
         s3_client: S3Client,
-    ):
+    ) -> None:
         self.llm = llm
         self.client = client
         self.s3_client = s3_client
+        self.request_model = request_model
+        self.response_model = response_model
         self.batch_record_output_model = BatchRecordOutput[request_model, response_model]
 
-    def get_results(self: Self, job_arn: str) -> BatchLLMResults:
+    def get_results(
+        self: Self, job_arn: str
+    ) -> list[BatchRecordOutput[RequestModel, ResponseModel]]:
         """Returns the results of the job. Returns an error it is not done yet."""
         job_details = self.client.get_model_invocation_job(jobIdentifier=job_arn)
-        status = job_details.get("status")
+        status = job_details["status"]
 
         if status != "Completed":
-            message = job_details.get("message")
+            message = job_details["message"]
             error_details = (
                 f"get_results called on {job_arn} when status is not 'Completed' "
                 f"with status: {status}. Message: '{message}'."
@@ -147,14 +104,14 @@ class BedrockBatchLLM:
 
         job_id = job_arn.split("/")[-1]
 
-        input_data_config = job_details.get("inputDataConfig", {})
-        s3_input_config = input_data_config.get("s3InputDataConfig", {})
-        input_uri = s3_input_config.get("s3Uri")
+        input_data_config = job_details["inputDataConfig"]
+        s3_input_config = input_data_config["s3InputDataConfig"]
+        input_uri = s3_input_config["s3Uri"]
         input_filename = input_uri.split("/")[-1]
 
-        output_data_config = job_details.get("outputDataConfig", {})
-        s3_output_config = output_data_config.get("s3OutputDataConfig", {})
-        output_uri = s3_output_config.get("s3Uri")
+        output_data_config = job_details["outputDataConfig"]
+        s3_output_config = output_data_config["s3OutputDataConfig"]
+        output_uri = s3_output_config["s3Uri"]
         path_part = output_uri[5:]  # Remove s3://
         parts = path_part.split("/", 1)  # Split on first /
 
@@ -164,27 +121,20 @@ class BedrockBatchLLM:
             output_prefix_key = parts[1]
 
         final_output_key = f"{output_prefix_key}{job_id}/{input_filename}.out"
-        llm_instance_type = type(self.llm)
-        record_output_model = LLM_TO_OUTPUT_MAP[llm_instance_type]
-        return self._validate_results(record_output_model, output_bucket, final_output_key)
+        return self._validate_results(output_bucket, final_output_key)
 
     def _validate_results(
         self,
-        response_model: type[BatchLLMResponseTypes],
         output_bucket: str,
         key: str,
-    ) -> BatchLLMResults:
+    ) -> list[BatchRecordOutput[RequestModel, ResponseModel]]:
         response = self.s3_client.get_object(Bucket=output_bucket, Key=key)
         response_body = response["Body"].read().decode("utf-8")
-
-        responses_list: list[BaseModel] = []
-        for line in response_body.splitlines():
-            record_obj = response_model.model_validate_json(line)
-            responses_list.append(record_obj)
-        casted_responses = cast("BatchLLMResponsesTypes", responses_list)
-        return BatchLLMResults(
-            responses=casted_responses,
-        )
+        output_messages = [
+            self.batch_record_output_model.model_validate_json(line)
+            for line in response_body.splitlines()
+        ]
+        return output_messages
 
     def wait_for_job_to_finish(self: Self, job_arn: str) -> None:
         """Returns once the job has either finished or failed."""
@@ -334,20 +284,20 @@ class BedrockBatchLLM:
 
     def _parse_conversations(
         self: Self, conversations: list[list[LLMMessage]], inference_config: LLMInferenceConfig
-    ) -> list[BatchRecordInput]:
-        input_requests: list[BatchRecordInput] = []
+    ) -> list[BatchRecordInput[RequestModel]]:
+        input_requests: list[BatchRecordInput[RequestModel]] = []
         for i, conversation in enumerate(conversations):
             msg = self.llm.create_request(messages=conversation, config=inference_config)
-            record = BatchRecordInput(
+            record = BatchRecordInput[self.request_model](
                 recordId=f"RECORD{i:010d}",
-                modelInput=msg,
+                modelInput=self.request_model.model_validate(msg),
             )
             input_requests.append(record)
         return input_requests
 
     def _upload_conversations(
         self: Self,
-        conversations: list[BatchRecordInput],
+        conversations: list[BatchRecordInput[RequestModel]],
         input_bucket: str,
         input_bucket_key: str,
     ) -> None:
