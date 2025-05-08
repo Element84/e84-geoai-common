@@ -1,59 +1,78 @@
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from typing import Any
 
 import fsspec  # type: ignore[reportMissingTypeStubs]
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 log = logging.getLogger(__name__)
 
 
-class ExperimentConfig(BaseModel):
+class ExperimentConfig[ParamsT: BaseModel](BaseModel):
     """Name and parameters of the experiment."""
 
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
     name: str
-    params: dict[str, Any]
+    params: ParamsT
 
 
-class EvalInput(BaseModel):
+class SingleEvalCase[
+    InputT: str | BaseModel,
+    RefOutputT: str | BaseModel,
+    AttrsT: BaseModel | None,
+](BaseModel):
     """A single evaluation test input and associated reference output."""
 
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
     id: str
-    input: str | dict[str, Any]
-    reference_output: str | dict[str, Any]
-    attrs: dict[str, Any] | None
+    input: InputT
+    reference_output: RefOutputT
+    attrs: AttrsT
 
 
-class EvalDataset(BaseModel):
-    """An evaluation dataset."""
-
-    items: list[EvalInput]
-
-
-class SingleEvalResult(BaseModel):
+class SingleEvalResult[
+    EvalInputT: SingleEvalCase[Any, Any, Any],
+    OutputT: str | BaseModel,
+    MetricsT: str | BaseModel,
+](BaseModel):
     """Evaluation result for a single test case."""
 
-    input: EvalInput
-    output: str | dict[str, Any] | None
-    metrics: dict[str, Any]
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    input: EvalInputT
+    output: OutputT
+    metrics: MetricsT
 
 
-class EvalReport(BaseModel):
+class EvalReport[
+    ExperimentConfigT: ExperimentConfig[Any],
+    SingleEvalResultT: SingleEvalResult[Any, Any, Any],
+    AggMetricsT: BaseModel,
+](BaseModel):
     """Evaluation report for an experiment."""
 
-    experiment_config: ExperimentConfig
-    results: list[SingleEvalResult]
-    aggregated_metrics: dict[str, Any]
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    experiment_config: ExperimentConfigT
+    results: list[SingleEvalResultT]
+    aggregated_metrics: AggMetricsT
 
 
 class BaseEvaluator(ABC):
     """Base eval class."""
 
     @abstractmethod
-    def eval_dataset(self, experiment_config: ExperimentConfig, dataset: EvalDataset) -> EvalReport:
+    def eval_dataset(
+        self,
+        experiment_config: ExperimentConfig[Any],
+        dataset: Iterable[SingleEvalCase[Any, Any, Any]],
+    ) -> EvalReport[Any, Any, Any]:
         """Evaluate a dataset using the given experiment config."""
 
-    def save_eval_report(self, eval_report: EvalReport, path: str) -> None:
+    def save_eval_report(self, eval_report: EvalReport[Any, Any, Any], path: str) -> None:
         """Save eval report as a JSON file.
 
         Args:
