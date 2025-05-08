@@ -44,7 +44,8 @@ dev = [
   "pyright>=1.1.381",
   "build>=1.2.2",
   "pre-commit>=3.8.0",
-  "pre-commit-hooks>=4.6.0"]
+  "pre-commit-hooks>=4.6.0",
+]
 
 
 [tool.pyright]
@@ -99,14 +100,16 @@ ignore = [
   # TO DO comment missing linked issue
   'TD003',
   # TO DO missing colon
-  'TD004']
+  'TD004',
+]
 
 [tool.ruff.lint.per-file-ignores]
 '__init__.py' = [
   # Module level import not at top of cell
   'E402',
   # Imported but unused
-  'F401']
+  'F401',
+]
 'tests/**/*' = [
   # Use of assert detected
   'S101',
@@ -117,4 +120,5 @@ ignore = [
   # Private member accessed
   'SLF001',
   # magic values
-  'PLR2004']
+  'PLR2004',
+]
