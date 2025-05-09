@@ -8,14 +8,16 @@ from e84_geoai_common.llm.core.llm import (
     TextContent,
 )
 from e84_geoai_common.llm.models.nova import BedrockNovaLLM
-from e84_geoai_common.llm.tests.mock_bedrock import (
-    make_test_bedrock_client,
+from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
+    make_test_bedrock_runtime_client,
     nova_response_with_content,
 )
 
 
 def test_basic_usage() -> None:
-    llm = BedrockNovaLLM(client=make_test_bedrock_client([nova_response_with_content("olleh")]))
+    llm = BedrockNovaLLM(
+        client=make_test_bedrock_runtime_client([nova_response_with_content("olleh")])
+    )
     config = LLMInferenceConfig()
     resp = llm.prompt(
         [LLMMessage(content="Output the word hello backwards and only that.")], config
@@ -24,7 +26,9 @@ def test_basic_usage() -> None:
 
 
 def test_with_response_prefix() -> None:
-    llm = BedrockNovaLLM(client=make_test_bedrock_client([nova_response_with_content("15")]))
+    llm = BedrockNovaLLM(
+        client=make_test_bedrock_runtime_client([nova_response_with_content("15")])
+    )
     config = LLMInferenceConfig(response_prefix="5 + 10 = ")
     resp = llm.prompt(
         [LLMMessage(content="Output the sum of 5 and 10 without additional explanation")], config
@@ -37,7 +41,9 @@ def test_json_mode() -> None:
         Create a list of the numbers 1 through 5.
     """
     llm = BedrockNovaLLM(
-        client=make_test_bedrock_client([nova_response_with_content("[1, 2, 3, 4, 5]\n```")])
+        client=make_test_bedrock_runtime_client(
+            [nova_response_with_content("[1, 2, 3, 4, 5]\n```")]
+        )
     )
     config = LLMInferenceConfig(json_mode=True)
     resp = llm.prompt([LLMMessage(content=json_mode_prompt)], config)
@@ -52,7 +58,9 @@ def encode_image_to_base64_str(image_path: str) -> str:
 
 
 def test_image_input() -> None:
-    llm = BedrockNovaLLM(client=make_test_bedrock_client([nova_response_with_content("cat")]))
+    llm = BedrockNovaLLM(
+        client=make_test_bedrock_runtime_client([nova_response_with_content("cat")])
+    )
 
     # locally ai generated picture of a cat
     image_path = str(Path(__file__).parent / "images/cat.webp")
