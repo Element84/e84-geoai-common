@@ -16,16 +16,16 @@ from e84_geoai_common.llm.core.llm import (
     TextContent,
 )
 from e84_geoai_common.llm.models.converse import BedrockConverseLLM
-from e84_geoai_common.llm.tests.mock_bedrock import (
+from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     _MockBedrockRuntimeClient,  # type: ignore[reportPrivateUsage]
     converse_response_with_content,
-    make_test_bedrock_client,
+    make_test_bedrock_runtime_client,
 )
 
 
 def test_basic_usage() -> None:
     llm = BedrockConverseLLM(
-        client=make_test_bedrock_client([converse_response_with_content("olleh")])
+        client=make_test_bedrock_runtime_client([converse_response_with_content("olleh")])
     )
     config = LLMInferenceConfig()
     resp = llm.prompt(
@@ -36,7 +36,7 @@ def test_basic_usage() -> None:
 
 def test_with_response_prefix() -> None:
     llm = BedrockConverseLLM(
-        client=make_test_bedrock_client([converse_response_with_content("  15")])
+        client=make_test_bedrock_runtime_client([converse_response_with_content("  15")])
     )
     config = LLMInferenceConfig(response_prefix="5 + 10 =")
     resp = llm.prompt(
@@ -53,7 +53,7 @@ def test_json_mode() -> None:
         {"result": [2, 3, 4, 5, 6]}
     """
     llm = BedrockConverseLLM(
-        client=make_test_bedrock_client(
+        client=make_test_bedrock_runtime_client(
             [converse_response_with_content('"result": [1, 2, 3, 4, 5]}')]
         )
     )
@@ -76,7 +76,7 @@ def encode_image_to_base64_str(image_path: str | Path) -> str:
 
 def test_image_input() -> None:
     llm = BedrockConverseLLM(
-        client=make_test_bedrock_client([converse_response_with_content("cat")])
+        client=make_test_bedrock_runtime_client([converse_response_with_content("cat")])
     )
 
     # locally ai generated picture of a cat
@@ -155,7 +155,7 @@ def test_tool_use_json() -> None:
             ],
         ),
     ]
-    client = make_test_bedrock_client(dummy_responses)
+    client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockConverseLLM(client=client)
     config = LLMInferenceConfig(tools=[tool])
 
@@ -230,7 +230,7 @@ def test_tool_use_image() -> None:
             ],
         ),
     ]
-    client = make_test_bedrock_client(dummy_responses)
+    client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockConverseLLM(client=client)
     config = LLMInferenceConfig(tools=[tool])
 

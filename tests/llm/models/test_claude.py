@@ -18,15 +18,17 @@ from e84_geoai_common.llm.core.llm import (
 from e84_geoai_common.llm.models.claude import (
     BedrockClaudeLLM,
 )
-from e84_geoai_common.llm.tests.mock_bedrock import (
+from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     _MockBedrockRuntimeClient,  # type: ignore[reportPrivateUsage]
     claude_response_with_content,
-    make_test_bedrock_client,
+    make_test_bedrock_runtime_client,
 )
 
 
 def test_basic_usage() -> None:
-    llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("olleh")]))
+    llm = BedrockClaudeLLM(
+        client=make_test_bedrock_runtime_client([claude_response_with_content("olleh")])
+    )
     config = LLMInferenceConfig()
     resp = llm.prompt(
         [LLMMessage(content="Output the word hello backwards and only that.")], config
@@ -36,7 +38,9 @@ def test_basic_usage() -> None:
 
 
 def test_with_response_prefix() -> None:
-    llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("  15")]))
+    llm = BedrockClaudeLLM(
+        client=make_test_bedrock_runtime_client([claude_response_with_content("  15")])
+    )
     config = LLMInferenceConfig(response_prefix="5 + 10 =")
     resp = llm.prompt(
         [LLMMessage(content="Output the sum of 5 and 10 without additional explanation")], config
@@ -52,7 +56,7 @@ def test_json_mode() -> None:
         {"result": [2, 3, 4, 5, 6]}
     """
     llm = BedrockClaudeLLM(
-        client=make_test_bedrock_client(
+        client=make_test_bedrock_runtime_client(
             [claude_response_with_content('"result": [1, 2, 3, 4, 5]}')]
         )
     )
@@ -74,7 +78,9 @@ def encode_image_to_base64_str(image_path: str | Path) -> str:
 
 
 def test_image_input() -> None:
-    llm = BedrockClaudeLLM(client=make_test_bedrock_client([claude_response_with_content("cat")]))
+    llm = BedrockClaudeLLM(
+        client=make_test_bedrock_runtime_client([claude_response_with_content("cat")])
+    )
 
     # locally ai generated picture of a cat
     image_path = Path(__file__).parent / "images/cat.webp"
@@ -147,7 +153,7 @@ def test_tool_use_json() -> None:
             ],
         ),
     ]
-    client = make_test_bedrock_client(dummy_responses)
+    client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockClaudeLLM(client=client)
     config = LLMInferenceConfig(tools=[tool])
 
@@ -220,7 +226,7 @@ def test_tool_use_image() -> None:
             ],
         ),
     ]
-    client = make_test_bedrock_client(dummy_responses)
+    client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockClaudeLLM(client=client)
     config = LLMInferenceConfig(tools=[tool])
 
