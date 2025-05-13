@@ -1,26 +1,17 @@
 from time import sleep
-from typing import TYPE_CHECKING, Self, cast
+from typing import Any
 
 import boto3
-from botocore.exceptions import ClientError
 from mypy_boto3_bedrock import BedrockClient
 from mypy_boto3_s3 import S3Client
 from pydantic import BaseModel, ConfigDict
 
-from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage
-from e84_geoai_common.llm.models.claude import (
-    CLAUDE_BEDROCK_MODEL_IDS,
-    BedrockClaudeLLM,
-)
-from e84_geoai_common.llm.models.nova import BedrockNovaLLM
-
-if TYPE_CHECKING:
-    from mypy_boto3_s3.literals import BucketLocationConstraintType
+from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
+from e84_geoai_common.llm.models.converse.converse import BedrockConverseLLM
+from e84_geoai_common.util import ensure_bucket_exists
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
-
-ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
 
 
 class BatchRecordInput[RequestModel: BaseModel](BaseModel):
@@ -78,7 +69,7 @@ class BatchLLMRequest(BaseModel):
 class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
     def __init__(
         self,
-        llm: ValidBatchLLMs,
+        llm: LLM,
         request_model: type[RequestModel],
         response_model: type[ResponseModel],
         bedrock_client: BedrockClient | None = None,
@@ -93,16 +84,19 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             bedrock_client: Optional pre-initialized bedrock boto3 client. Defaults to None.
             s3_client: Optional pre-initialized s3 boto3 client. Defaults to None.
         """
-        self.llm = llm or BedrockClaudeLLM(model_id=CLAUDE_BEDROCK_MODEL_IDS["Claude 3.5 Haiku"])
+        self.llm = llm
+        if isinstance(llm, BedrockConverseLLM):
+            raise TypeError(
+                "Converse uses a different invoke api than other"
+                "bedrock LLM models and is not supported by Batch!"
+            )
         self.request_model = request_model
         self.response_model = response_model
         self.bedrock_client = bedrock_client or boto3.client("bedrock")  # type: ignore[reportUnknownMemberType]
         self.s3_client = s3_client or boto3.client("s3")  # type: ignore[reportUnknownMemberType]
         self.batch_record_output_model = BatchRecordOutput[self.request_model, self.response_model]
 
-    def get_results(
-        self: Self, job_arn: str
-    ) -> list[BatchRecordOutput[RequestModel, ResponseModel]]:
+    def get_results(self, job_arn: str) -> list[BatchRecordOutput[RequestModel, ResponseModel]]:
         """Returns the results of the job. Returns an error it is not done yet."""
         job_details = self.bedrock_client.get_model_invocation_job(jobIdentifier=job_arn)
         status = job_details["status"]
@@ -150,7 +144,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
         return output_messages
 
-    def wait_for_job_to_finish(self: Self, job_arn: str) -> None:
+    def wait_for_job_to_finish(self, job_arn: str) -> None:
         """Returns once the job has either finished or failed."""
         while True:
             response = self.bedrock_client.get_model_invocation_job(jobIdentifier=job_arn)
@@ -168,7 +162,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
             sleep(30)
 
-    def get_job_arn(self: Self, job_name: str) -> str:
+    def get_job_arn(self, job_name: str) -> str:
         """Returns job arn given the job name."""
         paginator = self.bedrock_client.get_paginator("list_model_invocation_jobs")
 
@@ -192,7 +186,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         return job_arn_found
 
     def create_job(  # noqa: PLR0913
-        self: Self,
+        self,
         job_name: str,
         role_arn: str,
         input_s3_file_url: str,
@@ -200,7 +194,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         conversations: list[list[LLMMessage]] | None = None,
         inference_cfg: LLMInferenceConfig | None = None,
         *,
-        create_buckets_if_missing: bool,
+        create_buckets_if_missing: bool = False,
     ) -> str:
         """Creates and invokes batch job."""
         # check to make sure that these parse and error check correctly
@@ -208,13 +202,11 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             input_s3_file_url, output_s3_directory_url
         )
 
-        self._ensure_bucket_exists(
-            input_bucket,
-            create_buckets_if_missing=create_buckets_if_missing,
+        ensure_bucket_exists(
+            self.s3_client, input_bucket, create_buckets_if_missing=create_buckets_if_missing
         )
-        self._ensure_bucket_exists(
-            output_bucket,
-            create_buckets_if_missing=create_buckets_if_missing,
+        ensure_bucket_exists(
+            self.s3_client, output_bucket, create_buckets_if_missing=create_buckets_if_missing
         )
 
         # Upload files if conversations exist
@@ -243,7 +235,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         return response.get("jobArn")
 
     def _parse_s3_urls(
-        self: Self, input_s3_file_url: str, output_s3_directory_url: str
+        self, input_s3_file_url: str, output_s3_directory_url: str
     ) -> tuple[str, str, str]:
         """Return the bucket names and key(s) from an S3 URI."""
         if not input_s3_file_url.startswith("s3://") or not input_s3_file_url.startswith("s3://"):
@@ -276,34 +268,13 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
         return input_bucket, input_key, output_bucket
 
-    def _ensure_bucket_exists(self: Self, bucket: str, *, create_buckets_if_missing: bool) -> None:
-        """Ensure that the specified bucket exists and creates it if it doesn't and flag is true."""
-        try:
-            self.s3_client.head_bucket(Bucket=bucket)
-        except ClientError as e:
-            if create_buckets_if_missing:
-                region = self.s3_client.meta.region_name
-                if region == "us-east-1":
-                    self.s3_client.create_bucket(Bucket=bucket)
-                else:
-                    region = cast("BucketLocationConstraintType", region)
-                    self.s3_client.create_bucket(
-                        Bucket=bucket,
-                        CreateBucketConfiguration={"LocationConstraint": region},
-                    )
-            else:
-                msg = (
-                    f"Bucket {bucket} does not exist or you do not have permissions,"
-                    f" and create_buckets_if_missing flag is False."
-                )
-                raise ValueError(msg) from e
-
     def _parse_conversations(
-        self: Self, conversations: list[list[LLMMessage]], inference_config: LLMInferenceConfig
+        self, conversations: list[list[LLMMessage]], inference_config: LLMInferenceConfig
     ) -> list[BatchRecordInput[RequestModel]]:
         input_requests: list[BatchRecordInput[RequestModel]] = []
         for i, conversation in enumerate(conversations):
-            msg = self.llm.create_request(messages=conversation, config=inference_config)
+            msg: Any = self.llm.create_request(messages=conversation, config=inference_config)  # pyright: ignore [reportUnknownVariableType, reportAttributeAccessIssue, reportUnknownMemberType]
+
             record = BatchRecordInput[self.request_model](
                 recordId=f"RECORD{i:010d}",
                 modelInput=self.request_model.model_validate(msg),
@@ -312,7 +283,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         return input_requests
 
     def _upload_conversations(
-        self: Self,
+        self,
         conversations: list[BatchRecordInput[RequestModel]],
         input_bucket: str,
         input_bucket_key: str,

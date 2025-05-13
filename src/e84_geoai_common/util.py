@@ -4,7 +4,13 @@ import os
 import textwrap
 from collections.abc import Callable, Generator, Iterable
 from time import perf_counter
-from typing import Any, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+
+from botocore.exceptions import ClientError
+from mypy_boto3_s3 import S3Client
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.literals import BucketLocationConstraintType
 
 log = logging.getLogger(__name__)
 
@@ -164,3 +170,28 @@ def unique_by[T, K](
             yield item
         elif duplicate_handler_fn:
             duplicate_handler_fn(item, key)
+
+
+def ensure_bucket_exists(
+    s3_client: S3Client, bucket: str, *, create_buckets_if_missing: bool = False
+) -> None:
+    """Ensure that the specified bucket exists and creates it if it doesn't and flag is true."""
+    try:
+        s3_client.head_bucket(Bucket=bucket)
+    except ClientError as e:
+        if create_buckets_if_missing:
+            region = s3_client.meta.region_name
+            if region == "us-east-1":
+                s3_client.create_bucket(Bucket=bucket)
+            else:
+                region = cast("BucketLocationConstraintType", region)
+                s3_client.create_bucket(
+                    Bucket=bucket,
+                    CreateBucketConfiguration={"LocationConstraint": region},
+                )
+        else:
+            msg = (
+                f"Bucket {bucket} does not exist or you do not have permissions,"
+                f" and create_buckets_if_missing flag is False."
+            )
+            raise ValueError(msg) from e
