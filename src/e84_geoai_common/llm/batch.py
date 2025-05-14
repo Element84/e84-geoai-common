@@ -6,12 +6,15 @@ from mypy_boto3_bedrock import BedrockClient
 from mypy_boto3_s3 import S3Client
 from pydantic import BaseModel, ConfigDict
 
-from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMMessage
-from e84_geoai_common.llm.models.converse.converse import BedrockConverseLLM
+from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage
+from e84_geoai_common.llm.models.claude import BedrockClaudeLLM
+from e84_geoai_common.llm.models.nova import BedrockNovaLLM
 from e84_geoai_common.util import ensure_bucket_exists
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
+
+ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
 
 
 class BatchRecordInput[RequestModel: BaseModel](BaseModel):
@@ -69,7 +72,7 @@ class BatchLLMRequest(BaseModel):
 class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
     def __init__(
         self,
-        llm: LLM,
+        llm: ValidBatchLLMs,
         request_model: type[RequestModel],
         response_model: type[ResponseModel],
         bedrock_client: BedrockClient | None = None,
@@ -85,11 +88,6 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             s3_client: Optional pre-initialized s3 boto3 client. Defaults to None.
         """
         self.llm = llm
-        if isinstance(llm, BedrockConverseLLM):
-            raise TypeError(
-                "Converse uses a different invoke api than other"
-                "bedrock LLM models and is not supported by Batch!"
-            )
         self.request_model = request_model
         self.response_model = response_model
         self.bedrock_client = bedrock_client or boto3.client("bedrock")  # type: ignore[reportUnknownMemberType]
@@ -273,7 +271,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
     ) -> list[BatchRecordInput[RequestModel]]:
         input_requests: list[BatchRecordInput[RequestModel]] = []
         for i, conversation in enumerate(conversations):
-            msg: Any = self.llm.create_request(messages=conversation, config=inference_config)  # pyright: ignore [reportUnknownVariableType, reportAttributeAccessIssue, reportUnknownMemberType]
+            msg: Any = self.llm.create_request(messages=conversation, config=inference_config)
 
             record = BatchRecordInput[self.request_model](
                 recordId=f"RECORD{i:010d}",
