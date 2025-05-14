@@ -13,7 +13,7 @@ requires-python = ">=3.12"
 license = { file = "LICENSE" }
 dependencies = [
   "boto3>=1.35.20",
-  "boto3-stubs[bedrock-runtime]>=1.35.20",
+  "boto3-stubs[bedrock, bedrock-runtime, s3]>=1.35.20",
   "pydantic>=2.9.1",
   "shapely>=2.0.6",
   "types-shapely>=2.0.0.20240820",
@@ -44,7 +44,9 @@ dev = [
   "pyright>=1.1.381",
   "build>=1.2.2",
   "pre-commit>=3.8.0",
-  "pre-commit-hooks>=4.6.0"]
+  "pre-commit-hooks>=4.6.0",
+  "moto[s3]>=5.0.0",
+]
 
 
 [tool.pyright]
@@ -117,4 +119,6 @@ ignore = [
   # Private member accessed
   'SLF001',
   # magic values
-  'PLR2004']
+  'PLR2004',
+  #unused parameters
+  'ARG001']

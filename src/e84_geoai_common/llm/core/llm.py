@@ -182,6 +182,8 @@ class LLMInferenceConfig(BaseModel):
 class LLM(ABC):
     """An abstract base class for interacting with an LLM."""
 
+    model_id: str
+
     @abstractmethod
     def prompt(
         self,
@@ -192,3 +194,7 @@ class LLM(ABC):
 
         Returns the LLM message response.
         """
+
+    # @abstractmethod
+    # def create_request(self, messages: Sequence[LLMMessage], config: LLMInferenceConfig) -> Any:
+    #     """Create the LLM Request payload given a message and optional conversation history."""
