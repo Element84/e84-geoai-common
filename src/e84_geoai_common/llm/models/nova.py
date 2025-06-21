@@ -276,7 +276,7 @@ class BedrockNovaLLM(LLM):
 
 #########################
 # Code for manual testing
-# ruff: noqa: ERA001, T201
+# ruff: noqa: ERA001
 
 # llm = BedrockNovaLLM()
 # config = LLMInferenceConfig()

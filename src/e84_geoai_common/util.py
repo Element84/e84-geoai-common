@@ -4,7 +4,7 @@ import os
 import textwrap
 from collections.abc import Callable, Generator, Iterable
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, cast, overload
 
 from botocore.exceptions import ClientError
 from mypy_boto3_s3 import S3Client
@@ -13,9 +13,6 @@ if TYPE_CHECKING:
     from mypy_boto3_s3.literals import BucketLocationConstraintType
 
 log = logging.getLogger(__name__)
-
-
-F = TypeVar("F", bound=Callable[..., Any])
 
 
 def get_env_var(name: str, default: str | None = None) -> str:
@@ -78,14 +75,16 @@ def singleline(text: str) -> str:
 
 
 @overload
-def timed_function(arg: F) -> F: ...
+def timed_function[F: Callable[..., Any]](arg: F) -> F: ...
 
 
 @overload
-def timed_function(arg: logging.Logger | None = None) -> Callable[[F], F]: ...
+def timed_function[F: Callable[..., Any]](
+    arg: logging.Logger | None = None,
+) -> Callable[[F], F]: ...
 
 
-def timed_function(
+def timed_function[F: Callable[..., Any]](
     arg: Callable[..., Any] | logging.Logger | None = None,
 ) -> Callable[..., Any] | Callable[[F], F]:
     """A decorator that times function execution.

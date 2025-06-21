@@ -12,10 +12,6 @@ from e84_geoai_common.llm.models.converse.tool_use_types import (
     ConverseToolUseContent,
 )
 
-# Converse uses camel case for its variables. Ignore any linting problems with this.
-# ruff: noqa: N815
-
-
 ConverseMessageContentType = (
     ConverseTextContent | ConverseImageContent | ConverseToolUseContent | ConverseToolResultContent
 )
