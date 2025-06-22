@@ -29,16 +29,29 @@ log = logging.getLogger(__name__)
 # See https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html
 ANTHROPIC_API_VERSION = "bedrock-2023-05-31"
 
+CLAUDE_3_HAIKU = "us.anthropic.claude-3-haiku-20240307-v1:0"
+CLAUDE_3_5_SONNET = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
+CLAUDE_3_SONNET = "us.anthropic.claude-3-sonnet-20240229-v1:0"
+CLAUDE_3_OPUS = "us.anthropic.claude-3-opus-20240229-v1:0"
+CLAUDE_INSTANT = "us.anthropic.claude-instant-v1"
+CLAUDE_3_5_HAIKU = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+CLAUDE_3_5_SONNET_V2 = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+CLAUDE_3_7_SONNET = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+CLAUDE_4_SONNET = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+
+
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
+# DEPRECATED: Use the constants above instead.
 CLAUDE_BEDROCK_MODEL_IDS = {
-    "Claude 3 Haiku": "us.anthropic.claude-3-haiku-20240307-v1:0",
-    "Claude 3.5 Sonnet": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
-    "Claude 3 Sonnet": "us.anthropic.claude-3-sonnet-20240229-v1:0",
-    "Claude 3 Opus": "us.anthropic.claude-3-opus-20240229-v1:0",
-    "Claude Instant": "us.anthropic.claude-instant-v1",
-    "Claude 3.5 Haiku": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-    "Claude 3.5 Sonnet v2": "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-    "Claude 3.7 Sonnet": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    "Claude 3 Haiku": CLAUDE_3_HAIKU,
+    "Claude 3.5 Sonnet": CLAUDE_3_5_SONNET,
+    "Claude 3 Sonnet": CLAUDE_3_SONNET,
+    "Claude 3 Opus": CLAUDE_3_OPUS,
+    "Claude Instant": CLAUDE_INSTANT,
+    "Claude 3.5 Haiku": CLAUDE_3_5_HAIKU,
+    "Claude 3.5 Sonnet v2": CLAUDE_3_5_SONNET_V2,
+    "Claude 3.7 Sonnet": CLAUDE_3_7_SONNET,
+    "Claude 4 Sonnet": CLAUDE_4_SONNET,
 }
 
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
@@ -296,7 +309,7 @@ class BedrockClaudeLLM(LLM):
 
     def __init__(
         self,
-        model_id: str = CLAUDE_BEDROCK_MODEL_IDS["Claude 3 Haiku"],
+        model_id: str = CLAUDE_3_5_HAIKU,
         client: BedrockRuntimeClient | None = None,
     ) -> None:
         """Initialize.
