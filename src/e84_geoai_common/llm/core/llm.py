@@ -14,6 +14,8 @@ class TextContent(BaseModel):
 
     text: str
 
+    should_cache: bool = Field(default=False)
+
 
 class Base64ImageContent(BaseModel):
     """An image encoded for communication with an LLM."""

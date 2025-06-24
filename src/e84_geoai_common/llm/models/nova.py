@@ -5,7 +5,7 @@ from typing import Literal, Self, cast
 import boto3
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from e84_geoai_common.llm.core.llm import (
     LLM,
@@ -34,12 +34,28 @@ NOVA_BEDROCK_MODEL_IDS = {
 NovaImageFormat = Literal["jpeg", "png", "gif", "webp"]
 
 
+class NovaCachePoint(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["default"] = "default"
+
+
 class NovaTextContent(BaseModel):
     """Nova text context model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
     text: str
+
+    should_cache: bool = Field(exclude=True, default=False)
+
+    @computed_field
+    @property
+    def cache_point(self) -> NovaCachePoint | None:
+        if self.should_cache:
+            return NovaCachePoint()
+
+        return None
 
 
 class NovaImageSource(BaseModel):
@@ -154,7 +170,7 @@ def _llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
     def _handle_content(content: LLMMessageContentType) -> NovaTextContent | NovaImageContent:
         match content:
             case TextContent():
-                return NovaTextContent(text=content.text)
+                return NovaTextContent(text=content.text, should_cache=content.should_cache)
             case Base64ImageContent():
                 return NovaImageContent.from_b64_image_content(content)
             case LLMToolUseContent():

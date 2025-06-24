@@ -24,6 +24,7 @@ from e84_geoai_common.llm.core.llm import (
     TextContent,
 )
 from e84_geoai_common.llm.models.converse.data_content_types import (
+    ConverseCachePoint,
     ConverseImageContent,
     ConverseJSONContent,
     ConverseTextContent,
@@ -124,25 +125,36 @@ class ConverseInvokeLLMRequest(BaseModel):
 def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
     """Converts the generic LLM Message into a ConverseMessage."""
 
-    def _handle_content(content: LLMMessageContentType) -> ConverseMessageContentType:
+    def _handle_content(content: LLMMessageContentType) -> list[ConverseMessageContentType]:
         match content:
             case TextContent():
-                return ConverseTextContent(text=content.text)
+                converse_text_content = ConverseTextContent(text=content.text)
+
+                if content.should_cache:
+                    return [converse_text_content, ConverseCachePoint()]
+
+                return [ConverseTextContent(text=content.text)]
             case Base64ImageContent():
-                return ConverseImageContent.from_b64_image_content(content)
+                return [ConverseImageContent.from_b64_image_content(content)]
             case LLMToolUseContent():
-                return ConverseToolUseContent(
-                    toolUse=ConverseToolUse(
-                        toolUseId=content.id, name=content.name, input=content.input
+                return [
+                    ConverseToolUseContent(
+                        toolUse=ConverseToolUse(
+                            toolUseId=content.id, name=content.name, input=content.input
+                        )
                     )
-                )
+                ]
             case LLMToolResultContent():
-                return _llm_tool_result_to_converse_tool_result(content)
+                return [_llm_tool_result_to_converse_tool_result(content)]
 
     if isinstance(msg.content, str):
         content = [ConverseTextContent(text=msg.content)]
     else:
-        content = [_handle_content(subcontent) for subcontent in msg.content]
+        content = [
+            converted_content
+            for subcontent in msg.content
+            for converted_content in _handle_content(subcontent)
+        ]
     return ConverseMessage(role=msg.role, content=content)
 
 

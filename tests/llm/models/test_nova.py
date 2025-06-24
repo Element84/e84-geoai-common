@@ -84,3 +84,16 @@ def test_image_input() -> None:
     resp = llm.prompt([prompt_message], config)
 
     assert resp == LLMMessage(role="assistant", content="cat")
+
+
+def test_basic_usage_with_prompt_caching() -> None:
+    text_content = TextContent(
+        text="Output the word hello backwards and only that.", should_cache=True
+    )
+    llm = BedrockNovaLLM(
+        client=make_test_bedrock_runtime_client([nova_response_with_content("olleh")])
+    )
+    config = LLMInferenceConfig()
+    resp = llm.prompt([LLMMessage(content=[text_content])], config)
+    expected_resp = LLMMessage(role="assistant", content="olleh")
+    assert resp == expected_resp

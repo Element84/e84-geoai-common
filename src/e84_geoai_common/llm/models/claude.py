@@ -6,7 +6,7 @@ from typing import Any, Literal, cast
 import boto3
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from e84_geoai_common.llm.core.llm import (
     LLM,
@@ -44,6 +44,12 @@ CLAUDE_BEDROCK_MODEL_IDS = {
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
 
+class ClaudeCacheControl(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["ephemeral"] = "ephemeral"
+
+
 class ClaudeTextContent(BaseModel):
     """Claude text context model."""
 
@@ -51,6 +57,16 @@ class ClaudeTextContent(BaseModel):
 
     type: Literal["text"] = "text"
     text: str
+
+    should_request_prompt_cache: bool = Field(exclude=True, default=False)
+
+    @computed_field
+    @property
+    def cache_control(self) -> ClaudeCacheControl | None:
+        if self.should_request_prompt_cache:
+            return ClaudeCacheControl()
+
+        return None
 
 
 class ClaudeImageSource(BaseModel):
@@ -199,7 +215,9 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
     def _handle_content(content: LLMMessageContentType) -> ClaudeMessageContentType:
         match content:
             case TextContent():
-                return ClaudeTextContent(type="text", text=content.text)
+                return ClaudeTextContent(
+                    type="text", text=content.text, should_request_prompt_cache=content.should_cache
+                )
             case Base64ImageContent():
                 return ClaudeImageContent(
                     source=ClaudeImageSource(media_type=content.media_type, data=content.data)
@@ -210,7 +228,9 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
                 return _llm_tool_result_to_claude_tool_result(content)
 
     if isinstance(msg.content, str):
-        content = [ClaudeTextContent(type="text", text=msg.content)]
+        content = [
+            ClaudeTextContent(type="text", text=msg.content, should_request_prompt_cache=False)
+        ]
     else:
         content = [_handle_content(subcontent) for subcontent in msg.content]
     return ClaudeMessage(role=msg.role, content=content)

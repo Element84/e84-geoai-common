@@ -18,6 +18,12 @@ ConverseVideoFormat = Literal["mkv", "mov", "mp4", "webm", "flv", "mpeg", "mpg",
 BytesType = bytes
 
 
+class ConverseCachePoint(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
+    cachePoint: dict[str, str] = {"type": "default"}
+
+
 class ConverseTextContent(BaseModel):
     """Converse text context model."""
 
