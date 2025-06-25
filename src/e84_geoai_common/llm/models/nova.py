@@ -49,7 +49,7 @@ class NovaTextContent(BaseModel):
 
     should_cache: bool = Field(exclude=True, default=False)
 
-    @computed_field
+    @computed_field(alias="cachePoint")
     @property
     def cache_point(self) -> NovaCachePoint | None:
         if self.should_cache:
