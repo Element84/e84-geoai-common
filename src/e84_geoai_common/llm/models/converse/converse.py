@@ -126,6 +126,16 @@ def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
     """Converts the generic LLM Message into a ConverseMessage."""
 
     def _handle_content(content: LLMMessageContentType) -> list[ConverseMessageContentType]:
+        """Convert `LLMMessageContentType` to a list of `ConverseMessageContentType`.
+
+        This function returns a list the AWS Bedrock Converse API treats a
+        cache point as its own content type, whereas this library's API treats
+        it as a property of a content type.
+
+        If this function receives a content instance whose property indicates
+        it should request a cache point, it will return 2 content instances:
+        one with the content of the message, and another with the cache point.
+        """
         match content:
             case TextContent():
                 converse_text_content = ConverseTextContent(text=content.text)
