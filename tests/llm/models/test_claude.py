@@ -16,7 +16,9 @@ from e84_geoai_common.llm.core.llm import (
     TextContent,
 )
 from e84_geoai_common.llm.models.claude import (
+    CLAUDE_BEDROCK_MODEL_IDS,
     BedrockClaudeLLM,
+    ClaudeTextContent,
 )
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     _MockBedrockRuntimeClient,  # type: ignore[reportPrivateUsage]
@@ -269,3 +271,44 @@ def test_basic_usage_with_prompt_caching() -> None:
     resp = llm.prompt([LLMMessage(content=[text_content])], config)
     expected_resp = LLMMessage(role="assistant", content=[TextContent(text="olleh")])
     assert resp == expected_resp
+
+
+def test_large_system_prompt() -> None:
+    """This test is most interesting as a live-test.
+
+    It validates that the cache control headers indicate that prompt caching actually worked.
+
+    It uses a large system prompt so that the minimum token limit is reached.
+    """
+    long_system_prompt_path = Path(__file__).parent / "long_system_prompt.txt"
+    with long_system_prompt_path.open(encoding="utf-8") as file:
+        system_prompt = file.read()
+
+        text_content = TextContent(
+            text="Output the word hello backwards and only that.", should_cache=True
+        )
+        llm = BedrockClaudeLLM(
+            model_id=CLAUDE_BEDROCK_MODEL_IDS["Claude 3.5 Haiku"],
+            client=make_test_bedrock_runtime_client(
+                [
+                    claude_response_with_content(
+                        [{"type": "text", "text": "olleh"}],
+                        {
+                            "usage": {
+                                "input_tokens": 123,
+                                "output_tokens": 321,
+                                "cache_creation_input_tokens": 2500,
+                                "cache_read_input_tokens": 0,
+                            }
+                        },
+                    )
+                ]
+            ),
+        )
+        config = LLMInferenceConfig(system_prompt=system_prompt)
+        request = llm.create_request([LLMMessage(content=[text_content])], config)
+        response = llm.invoke_model_with_request(request)
+
+        assert response.content == [ClaudeTextContent(text="olleh")]
+        assert response.usage.cache_creation_input_tokens is not None
+        assert response.usage.cache_creation_input_tokens > 0
