@@ -23,6 +23,16 @@ from e84_geoai_common.llm.core.llm import (
     LLMToolUseContent,
     TextContent,
 )
+from e84_geoai_common.llm.models.claude import (
+    CLAUDE_3_5_HAIKU,
+    CLAUDE_3_5_SONNET,
+    CLAUDE_3_5_SONNET_V2,
+    CLAUDE_3_HAIKU,
+    CLAUDE_3_OPUS,
+    CLAUDE_3_SONNET,
+    CLAUDE_4_SONNET,
+    CLAUDE_INSTANT,
+)
 from e84_geoai_common.llm.models.converse.data_content_types import (
     ConverseImageContent,
     ConverseJSONContent,
@@ -52,6 +62,7 @@ from e84_geoai_common.llm.models.converse.tool_use_types import (
     ConverseToolUse,
     ConverseToolUseContent,
 )
+from e84_geoai_common.llm.models.nova import NOVA_LITE, NOVA_MICRO, NOVA_PRO
 from e84_geoai_common.util import timed_function
 
 # Converse uses camel case for its variables. Ignore any linting problems with this.
@@ -60,24 +71,34 @@ from e84_geoai_common.util import timed_function
 log = logging.getLogger(__name__)
 
 
+LLAMA_3_1_70_B_INSTRUCT = "us.meta.llama3-1-70b-instruct-v1:0"
+LLAMA_3_1_8_B_INSTRUCT = "us.meta.llama3-1-8b-instruct-v1:0"
+LLAMA_3_2_11_B_VISION_INSTRUCT = "us.meta.llama3-2-11b-instruct-v1:0"
+LLAMA_3_2_1_B_INSTRUCT = "us.meta.llama3-2-1b-instruct-v1:0"
+LLAMA_3_2_3_B_INSTRUCT = "us.meta.llama3-2-3b-instruct-v1:0"
+LLAMA_3_2_90_B_VISION_INSTRUCT = "us.meta.llama3-2-90b-instruct-v1:0"
+LLAMA_3_3_70_B_INSTRUCT = "us.meta.llama3-3-70b-instruct-v1:0"
+
+# DEPRECATED: Use the constants above instead.
 CONVERSE_BEDROCK_MODEL_IDS = {
-    "Claude 3 Haiku": "us.anthropic.claude-3-haiku-20240307-v1:0",
-    "Claude 3.5 Sonnet": "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
-    "Claude 3 Sonnet": "us.anthropic.claude-3-sonnet-20240229-v1:0",
-    "Claude 3 Opus": "anthropic.claude-3-opus-20240229-v1:0",
-    "Claude Instant": "anthropic.claude-instant-v1",
-    "Claude 3.5 Haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
-    "Claude 3.5 Sonnet v2": "anthropic.claude-3-5-sonnet-20241022-v2:0",
-    "Nova Lite": "us.amazon.nova-lite-v1:0",
-    "Nova Micro": "us.amazon.nova-micro-v1:0",
-    "Nova Pro": "us.amazon.nova-pro-v1:0",
-    "Llama 3.1 70B Instruct": "us.meta.llama3-1-70b-instruct-v1:0",
-    "Llama 3.1 8B Instruct": "us.meta.llama3-1-8b-instruct-v1:0",
-    "Llama 3.2 11B Vision Instruct": "us.meta.llama3-2-11b-instruct-v1:0",
-    "Llama 3.2 1B Instruct": "us.meta.llama3-2-1b-instruct-v1:0",
-    "Llama 3.2 3B Instruct": "us.meta.llama3-2-3b-instruct-v1:0",
-    "Llama 3.2 90B Vision Instruct": "us.meta.llama3-2-90b-instruct-v1:0",
-    "Llama 3.3 70B Instruct": "us.meta.llama3-3-70b-instruct-v1:0",
+    "Claude 3 Haiku": CLAUDE_3_HAIKU,
+    "Claude 3.5 Sonnet": CLAUDE_3_5_SONNET,
+    "Claude 3 Sonnet": CLAUDE_3_SONNET,
+    "Claude 3 Opus": CLAUDE_3_OPUS,
+    "Claude Instant": CLAUDE_INSTANT,
+    "Claude 3.5 Haiku": CLAUDE_3_5_HAIKU,
+    "Claude 3.5 Sonnet v2": CLAUDE_3_5_SONNET_V2,
+    "Claude 4 Sonnet": CLAUDE_4_SONNET,
+    "Nova Lite": NOVA_LITE,
+    "Nova Micro": NOVA_MICRO,
+    "Nova Pro": NOVA_PRO,
+    "Llama 3.1 70B Instruct": LLAMA_3_1_70_B_INSTRUCT,
+    "Llama 3.1 8B Instruct": LLAMA_3_1_8_B_INSTRUCT,
+    "Llama 3.2 11B Vision Instruct": LLAMA_3_2_11_B_VISION_INSTRUCT,
+    "Llama 3.2 1B Instruct": LLAMA_3_2_1_B_INSTRUCT,
+    "Llama 3.2 3B Instruct": LLAMA_3_2_3_B_INSTRUCT,
+    "Llama 3.2 90B Vision Instruct": LLAMA_3_2_90_B_VISION_INSTRUCT,
+    "Llama 3.3 70B Instruct": LLAMA_3_3_70_B_INSTRUCT,
 }
 
 

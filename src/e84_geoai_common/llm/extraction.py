@@ -1,16 +1,13 @@
 import logging
-from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from e84_geoai_common.llm.core import LLM, LLMInferenceConfig, LLMMessage
 
-Model = TypeVar("Model", bound=BaseModel)
-
 log = logging.getLogger(__name__)
 
 
-class ExtractDataExample(BaseModel, Generic[Model]):
+class ExtractDataExample[Model: BaseModel](BaseModel):
     """Example data extraction scenario.
 
     Attributes:
@@ -37,7 +34,7 @@ class ExtractDataExample(BaseModel, Generic[Model]):
         return f'Example: {self.name}\nUser Query: "{self.user_query}"\n\n{query_json}'
 
 
-def extract_data_from_text(
+def extract_data_from_text[Model: BaseModel](
     *,
     llm: LLM,
     model_type: type[Model],

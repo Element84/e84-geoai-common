@@ -1,6 +1,6 @@
 """Pydantic models for GeoJSON features."""
 
-from typing import Annotated, Any, Generic, Literal, TypeVar, cast
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import (
     BaseModel,
@@ -13,10 +13,8 @@ from shapely.geometry.base import BaseGeometry
 
 from e84_geoai_common.geometry import geometry_from_geojson_dict
 
-T = TypeVar("T")
 
-
-class Feature(BaseModel, Generic[T]):
+class Feature[T](BaseModel):
     """Represents a feature object as defined in the GeoJSON format.
 
     Attributes:
@@ -49,7 +47,7 @@ class Feature(BaseModel, Generic[T]):
         return g.__geo_interface__
 
 
-class FeatureCollection(BaseModel, Generic[T]):
+class FeatureCollection[T](BaseModel):
     """Represents a collection of feature objects in the GeoJSON format.
 
     Attributes:

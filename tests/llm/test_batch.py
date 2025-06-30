@@ -9,7 +9,7 @@ from e84_geoai_common.llm.batch import (
 )
 from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage, TextContent
 from e84_geoai_common.llm.models.claude import (
-    CLAUDE_BEDROCK_MODEL_IDS,
+    CLAUDE_3_5_HAIKU,
     BedrockClaudeLLM,
     ClaudeInvokeLLMRequest,
     ClaudeResponse,
@@ -48,7 +48,7 @@ def test_claude_create_and_run_job(
     timestamp_ns = time.time_ns()
     job_name = f"pytest-job-{timestamp_ns}"
 
-    llm = BedrockClaudeLLM(model_id=CLAUDE_BEDROCK_MODEL_IDS["Claude 3.5 Haiku"])
+    llm = BedrockClaudeLLM(model_id=CLAUDE_3_5_HAIKU)
     llm_question = "What is 10+10?"
     llm_response = "10 + 10 = 20"
 

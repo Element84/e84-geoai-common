@@ -2,6 +2,13 @@
 
 from e84_geoai_common.llm.models.converse.converse import (
     CONVERSE_BEDROCK_MODEL_IDS,
+    LLAMA_3_1_8_B_INSTRUCT,
+    LLAMA_3_1_70_B_INSTRUCT,
+    LLAMA_3_2_1_B_INSTRUCT,
+    LLAMA_3_2_3_B_INSTRUCT,
+    LLAMA_3_2_11_B_VISION_INSTRUCT,
+    LLAMA_3_2_90_B_VISION_INSTRUCT,
+    LLAMA_3_3_70_B_INSTRUCT,
     BedrockConverseLLM,
     ConverseInferenceConfig,
     ConverseInvokeLLMRequest,
@@ -55,6 +62,13 @@ from e84_geoai_common.llm.models.converse.tool_use_types import (
 
 __all__ = [
     "CONVERSE_BEDROCK_MODEL_IDS",
+    "LLAMA_3_1_8_B_INSTRUCT",
+    "LLAMA_3_1_70_B_INSTRUCT",
+    "LLAMA_3_2_1_B_INSTRUCT",
+    "LLAMA_3_2_3_B_INSTRUCT",
+    "LLAMA_3_2_11_B_VISION_INSTRUCT",
+    "LLAMA_3_2_90_B_VISION_INSTRUCT",
+    "LLAMA_3_3_70_B_INSTRUCT",
     "BedrockConverseLLM",
     "ConverseAdditionalModelRequestFields",
     "ConverseAnyToolChoice",
