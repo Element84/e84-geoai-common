@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    CachePointContent,
     JSONContent,
     LLMDataContentType,
     LLMInferenceConfig,
@@ -125,7 +126,7 @@ class ConverseInvokeLLMRequest(BaseModel):
 def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
     """Converts the generic LLM Message into a ConverseMessage."""
 
-    def _handle_content(content: LLMMessageContentType) -> list[ConverseMessageContentType]:
+    def _handle_content(content: LLMMessageContentType) -> ConverseMessageContentType:
         """Convert `LLMMessageContentType` to a list of `ConverseMessageContentType`.
 
         This function returns a list the AWS Bedrock Converse API treats a
@@ -138,33 +139,25 @@ def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
         """
         match content:
             case TextContent():
-                converse_text_content = ConverseTextContent(text=content.text)
-
-                if content.should_cache:
-                    return [converse_text_content, ConverseCachePoint()]
-
-                return [ConverseTextContent(text=content.text)]
+                return ConverseTextContent(text=content.text)
             case Base64ImageContent():
-                return [ConverseImageContent.from_b64_image_content(content)]
+                return ConverseImageContent.from_b64_image_content(content)
             case LLMToolUseContent():
-                return [
-                    ConverseToolUseContent(
-                        toolUse=ConverseToolUse(
-                            toolUseId=content.id, name=content.name, input=content.input
-                        )
+                return ConverseToolUseContent(
+                    toolUse=ConverseToolUse(
+                        toolUseId=content.id, name=content.name, input=content.input
                     )
-                ]
+                )
+
             case LLMToolResultContent():
-                return [_llm_tool_result_to_converse_tool_result(content)]
+                return _llm_tool_result_to_converse_tool_result(content)
+            case CachePointContent():
+                return ConverseCachePoint()
 
     if isinstance(msg.content, str):
         content = [ConverseTextContent(text=msg.content)]
     else:
-        content = [
-            converted_content
-            for subcontent in msg.content
-            for converted_content in _handle_content(subcontent)
-        ]
+        content = [_handle_content(content) for content in msg.content]
     return ConverseMessage(role=msg.role, content=content)
 
 

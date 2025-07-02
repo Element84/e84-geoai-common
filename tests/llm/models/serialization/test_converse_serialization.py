@@ -1,6 +1,11 @@
 from unittest.mock import Mock
 
-from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage, TextContent
+from e84_geoai_common.llm.core.llm import (
+    CachePointContent,
+    LLMInferenceConfig,
+    LLMMessage,
+    TextContent,
+)
 from e84_geoai_common.llm.models.converse.converse import BedrockConverseLLM
 
 
@@ -59,7 +64,8 @@ def test_serialize_text_content_with_caching() -> None:
     llm = BedrockConverseLLM(client=Mock())
     message = LLMMessage(
         content=[
-            TextContent(text="Output the word hello backwards and only that.", should_cache=True)
+            TextContent(text="Output the word hello backwards and only that."),
+            CachePointContent(),
         ]
     )
     config = LLMInferenceConfig()

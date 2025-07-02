@@ -14,8 +14,6 @@ class TextContent(BaseModel):
 
     text: str
 
-    should_cache: bool = Field(default=False)
-
 
 class Base64ImageContent(BaseModel):
     """An image encoded for communication with an LLM."""
@@ -57,7 +55,17 @@ class LLMToolResultContent(BaseModel):
     status: Literal["success", "error"] | None = None
 
 
-LLMMessageContentType = TextContent | Base64ImageContent | LLMToolUseContent | LLMToolResultContent
+class CachePointContent(BaseModel):
+    """Tool invocation request."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["default"] = "default"
+
+
+LLMMessageContentType = (
+    TextContent | Base64ImageContent | LLMToolUseContent | LLMToolResultContent | CachePointContent
+)
 
 
 class LLMMessage(BaseModel):

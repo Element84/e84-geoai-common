@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Sequence
+from functools import reduce
 from typing import Any, Literal, cast
 
 import boto3
@@ -11,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    CachePointContent,
     JSONContent,
     LLMDataContentType,
     LLMInferenceConfig,
@@ -78,6 +80,16 @@ class ClaudeImageSource(BaseModel):
     media_type: ConverseMediaType
     data: str
 
+    should_request_prompt_cache: bool = Field(exclude=True, default=False)
+
+    @computed_field
+    @property
+    def cache_control(self) -> ClaudeCacheControl | None:
+        if self.should_request_prompt_cache:
+            return ClaudeCacheControl()
+
+        return None
+
 
 class ClaudeImageContent(BaseModel):
     """Claude text context model."""
@@ -86,6 +98,16 @@ class ClaudeImageContent(BaseModel):
 
     type: Literal["image"] = "image"
     source: ClaudeImageSource
+
+    should_request_prompt_cache: bool = Field(exclude=True, default=False)
+
+    @computed_field
+    @property
+    def cache_control(self) -> ClaudeCacheControl | None:
+        if self.should_request_prompt_cache:
+            return ClaudeCacheControl()
+
+        return None
 
 
 class ClaudeToolUseContent(BaseModel):
@@ -98,6 +120,16 @@ class ClaudeToolUseContent(BaseModel):
     input: dict[str, Any]
     name: str
 
+    should_request_prompt_cache: bool = Field(exclude=True, default=False)
+
+    @computed_field
+    @property
+    def cache_control(self) -> ClaudeCacheControl | None:
+        if self.should_request_prompt_cache:
+            return ClaudeCacheControl()
+
+        return None
+
 
 class ClaudeToolResultContent(BaseModel):
     """Claude tool result model."""
@@ -108,6 +140,16 @@ class ClaudeToolResultContent(BaseModel):
     tool_use_id: str
     content: str | Sequence[ClaudeTextContent | ClaudeImageContent]
     is_error: bool | None = None
+
+    should_request_prompt_cache: bool = Field(exclude=True, default=False)
+
+    @computed_field
+    @property
+    def cache_control(self) -> ClaudeCacheControl | None:
+        if self.should_request_prompt_cache:
+            return ClaudeCacheControl()
+
+        return None
 
 
 ClaudeMessageContentType = (
@@ -212,27 +254,48 @@ class ClaudeResponse(BaseModel):
 def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
     """Converts the generic LLM Message into a ClaudeMessage."""
 
-    def _handle_content(content: LLMMessageContentType) -> ClaudeMessageContentType:
+    def _handle_content(
+        acc: tuple[ClaudeMessageContentType, ...], content: LLMMessageContentType
+    ) -> tuple[ClaudeMessageContentType, ...]:
         match content:
             case TextContent():
-                return ClaudeTextContent(
-                    type="text", text=content.text, should_request_prompt_cache=content.should_cache
+                return (
+                    *acc,
+                    ClaudeTextContent(text=content.text),
                 )
             case Base64ImageContent():
-                return ClaudeImageContent(
-                    source=ClaudeImageSource(media_type=content.media_type, data=content.data)
+                return (
+                    *acc,
+                    ClaudeImageContent(
+                        source=ClaudeImageSource(media_type=content.media_type, data=content.data)
+                    ),
                 )
             case LLMToolUseContent():
-                return ClaudeToolUseContent(id=content.id, name=content.name, input=content.input)
+                return (
+                    *acc,
+                    ClaudeToolUseContent(id=content.id, name=content.name, input=content.input),
+                )
             case LLMToolResultContent():
-                return _llm_tool_result_to_claude_tool_result(content)
+                return (*acc, _llm_tool_result_to_claude_tool_result(content))
+            case CachePointContent():
+                # If cache point is first element, drop it.
+                if len(acc) == 0:
+                    return acc
+
+                # Modify should cache of last element in Sequence
+                acc_until_last: tuple[ClaudeMessageContentType, ...] = acc[:-1]
+
+                last_content = acc[-1]
+                last_content.should_request_prompt_cache = True
+
+                return (*acc_until_last, last_content)
 
     if isinstance(msg.content, str):
         content = [
             ClaudeTextContent(type="text", text=msg.content, should_request_prompt_cache=False)
         ]
     else:
-        content = [_handle_content(subcontent) for subcontent in msg.content]
+        content = reduce(_handle_content, msg.content, ())
     return ClaudeMessage(role=msg.role, content=content)
 
 

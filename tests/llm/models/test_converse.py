@@ -7,6 +7,7 @@ from rich import print as rich_print
 
 from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
+    CachePointContent,
     JSONContent,
     LLMInferenceConfig,
     LLMMessage,
@@ -265,14 +266,12 @@ def test_tool_use_image() -> None:
 
 
 def test_basic_usage_with_prompt_caching() -> None:
-    text_content = TextContent(
-        text="Output the word hello backwards and only that.", should_cache=True
-    )
+    text_content = TextContent(text="Output the word hello backwards and only that.")
     llm = BedrockConverseLLM(
         client=make_test_bedrock_runtime_client([converse_response_with_content("olleh")])
     )
     config = LLMInferenceConfig()
-    resp = llm.prompt([LLMMessage(content=[text_content])], config)
+    resp = llm.prompt([LLMMessage(content=[text_content, CachePointContent()])], config)
     expected_resp = LLMMessage(role="assistant", content=[TextContent(text="olleh")])
     assert resp == expected_resp
 
@@ -288,9 +287,7 @@ def test_large_system_prompt() -> None:
     with long_system_prompt_path.open(encoding="utf-8") as file:
         system_prompt = file.read()
 
-        text_content = TextContent(
-            text="Output the word hello backwards and only that.", should_cache=True
-        )
+        text_content = TextContent(text="Output the word hello backwards and only that.")
         llm = BedrockConverseLLM(
             model_id=CONVERSE_BEDROCK_MODEL_IDS["Nova Pro"],
             client=make_test_bedrock_runtime_client(
@@ -311,7 +308,9 @@ def test_large_system_prompt() -> None:
             ),
         )
         config = LLMInferenceConfig(system_prompt=system_prompt)
-        request = llm.create_request([LLMMessage(content=[text_content])], config)
+        request = llm.create_request(
+            [LLMMessage(content=[text_content, CachePointContent()])], config
+        )
         response = llm.invoke_model_with_request(request)
 
         assert response.output == ConverseMessageResponse(
