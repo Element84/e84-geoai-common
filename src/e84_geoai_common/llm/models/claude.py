@@ -53,12 +53,12 @@ class ClaudeCacheControl(BaseModel):
 
 
 class ClaudeCacheableContent(BaseModel):
-    should_request_prompt_cache: bool = Field(exclude=True, default=False)
+    should_cache: bool = Field(exclude=True, default=False)
 
     @computed_field
     @property
     def cache_control(self) -> ClaudeCacheControl | None:
-        if self.should_request_prompt_cache:
+        if self.should_cache:
             return ClaudeCacheControl()
 
         return None
@@ -248,14 +248,12 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
                 acc_until_last: tuple[ClaudeMessageContentType, ...] = acc[:-1]
 
                 last_content = acc[-1]
-                last_content.should_request_prompt_cache = True
+                last_content.should_cache = True
 
                 return (*acc_until_last, last_content)
 
     if isinstance(msg.content, str):
-        content = [
-            ClaudeTextContent(type="text", text=msg.content, should_request_prompt_cache=False)
-        ]
+        content = [ClaudeTextContent(type="text", text=msg.content, should_cache=False)]
     else:
         content = reduce(_handle_content, msg.content, ())
     return ClaudeMessage(role=msg.role, content=content)
