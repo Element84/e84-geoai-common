@@ -42,13 +42,7 @@ class NovaCachePoint(BaseModel):
     type: Literal["default"] = "default"
 
 
-class NovaTextContent(BaseModel):
-    """Nova text context model."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    text: str
-
+class NovaCacheableContent(BaseModel):
     should_cache: bool = Field(exclude=True, default=False)
 
     @computed_field(alias="cachePoint")
@@ -58,6 +52,14 @@ class NovaTextContent(BaseModel):
             return NovaCachePoint()
 
         return None
+
+
+class NovaTextContent(NovaCacheableContent):
+    """Nova text context model."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    text: str
 
 
 class NovaImageSource(BaseModel):
@@ -72,20 +74,10 @@ class NovaImageInnerContent(BaseModel):
     source: NovaImageSource
 
 
-class NovaImageContent(BaseModel):
+class NovaImageContent(NovaCacheableContent):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     image: NovaImageInnerContent
-
-    should_cache: bool = Field(exclude=True, default=False)
-
-    @computed_field(alias="cachePoint")
-    @property
-    def cache_point(self) -> NovaCachePoint | None:
-        if self.should_cache:
-            return NovaCachePoint()
-
-        return None
 
     @classmethod
     def from_b64_image_content(cls, image: Base64ImageContent) -> Self:
