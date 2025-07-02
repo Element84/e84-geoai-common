@@ -52,14 +52,7 @@ class ClaudeCacheControl(BaseModel):
     type: Literal["ephemeral"] = "ephemeral"
 
 
-class ClaudeTextContent(BaseModel):
-    """Claude text context model."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    type: Literal["text"] = "text"
-    text: str
-
+class ClaudeCacheableContent(BaseModel):
     should_request_prompt_cache: bool = Field(exclude=True, default=False)
 
     @computed_field
@@ -71,7 +64,16 @@ class ClaudeTextContent(BaseModel):
         return None
 
 
-class ClaudeImageSource(BaseModel):
+class ClaudeTextContent(ClaudeCacheableContent):
+    """Claude text context model."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["text"] = "text"
+    text: str
+
+
+class ClaudeImageSource(ClaudeCacheableContent):
     """An image encoded for communication with an LLM."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -80,18 +82,8 @@ class ClaudeImageSource(BaseModel):
     media_type: ConverseMediaType
     data: str
 
-    should_request_prompt_cache: bool = Field(exclude=True, default=False)
 
-    @computed_field
-    @property
-    def cache_control(self) -> ClaudeCacheControl | None:
-        if self.should_request_prompt_cache:
-            return ClaudeCacheControl()
-
-        return None
-
-
-class ClaudeImageContent(BaseModel):
+class ClaudeImageContent(ClaudeCacheableContent):
     """Claude text context model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -99,18 +91,8 @@ class ClaudeImageContent(BaseModel):
     type: Literal["image"] = "image"
     source: ClaudeImageSource
 
-    should_request_prompt_cache: bool = Field(exclude=True, default=False)
 
-    @computed_field
-    @property
-    def cache_control(self) -> ClaudeCacheControl | None:
-        if self.should_request_prompt_cache:
-            return ClaudeCacheControl()
-
-        return None
-
-
-class ClaudeToolUseContent(BaseModel):
+class ClaudeToolUseContent(ClaudeCacheableContent):
     """Represents a tool use request from Claude."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -120,18 +102,8 @@ class ClaudeToolUseContent(BaseModel):
     input: dict[str, Any]
     name: str
 
-    should_request_prompt_cache: bool = Field(exclude=True, default=False)
 
-    @computed_field
-    @property
-    def cache_control(self) -> ClaudeCacheControl | None:
-        if self.should_request_prompt_cache:
-            return ClaudeCacheControl()
-
-        return None
-
-
-class ClaudeToolResultContent(BaseModel):
+class ClaudeToolResultContent(ClaudeCacheableContent):
     """Claude tool result model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -140,16 +112,6 @@ class ClaudeToolResultContent(BaseModel):
     tool_use_id: str
     content: str | Sequence[ClaudeTextContent | ClaudeImageContent]
     is_error: bool | None = None
-
-    should_request_prompt_cache: bool = Field(exclude=True, default=False)
-
-    @computed_field
-    @property
-    def cache_control(self) -> ClaudeCacheControl | None:
-        if self.should_request_prompt_cache:
-            return ClaudeCacheControl()
-
-        return None
 
 
 ClaudeMessageContentType = (
