@@ -56,7 +56,7 @@ class LLMToolResultContent(BaseModel):
 
 
 class CachePointContent(BaseModel):
-    """Tool invocation request."""
+    """Cache point content model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
