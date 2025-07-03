@@ -7,7 +7,7 @@ from typing import Any, Literal, cast
 import boto3
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field
 
 from e84_geoai_common.llm.core.llm import (
     LLM,
@@ -53,15 +53,7 @@ class ClaudeCacheControl(BaseModel):
 
 
 class ClaudeCacheableContent(BaseModel):
-    should_cache: bool = Field(exclude=True, default=False)
-
-    @computed_field
-    @property
-    def cache_control(self) -> ClaudeCacheControl | None:
-        if self.should_cache:
-            return ClaudeCacheControl()
-
-        return None
+    cache_control: ClaudeCacheControl | None = Field(default=None)
 
 
 class ClaudeTextContent(ClaudeCacheableContent):
@@ -248,12 +240,12 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
                 acc_until_last: tuple[ClaudeMessageContentType, ...] = acc[:-1]
 
                 last_content = acc[-1]
-                last_content.should_cache = True
+                last_content.cache_control = ClaudeCacheControl()
 
                 return (*acc_until_last, last_content)
 
     if isinstance(msg.content, str):
-        content = [ClaudeTextContent(type="text", text=msg.content, should_cache=False)]
+        content = [ClaudeTextContent(type="text", text=msg.content, cache_control=None)]
     else:
         content = reduce(_handle_content, msg.content, ())
     return ClaudeMessage(role=msg.role, content=content)

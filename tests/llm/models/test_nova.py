@@ -126,7 +126,8 @@ def test_large_system_prompt() -> None:
 
         assert response.output == NovaResponseOutput(
             message=NovaMessage(
-                role="assistant", content=[NovaTextContent(text="olleh", should_cache=False)]
+                role="assistant",
+                content=[NovaTextContent(text="olleh", cache_point=None)],
             )
         )
 

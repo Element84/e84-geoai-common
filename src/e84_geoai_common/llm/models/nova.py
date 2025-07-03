@@ -6,7 +6,7 @@ from typing import Literal, Self, cast
 import boto3
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field
 
 from e84_geoai_common.llm.core.llm import (
     LLM,
@@ -43,15 +43,7 @@ class NovaCachePoint(BaseModel):
 
 
 class NovaCacheableContent(BaseModel):
-    should_cache: bool = Field(exclude=True, default=False)
-
-    @computed_field(alias="cachePoint")
-    @property
-    def cache_point(self) -> NovaCachePoint | None:
-        if self.should_cache:
-            return NovaCachePoint()
-
-        return None
+    cache_point: NovaCachePoint | None = Field(default=None)
 
 
 class NovaTextContent(NovaCacheableContent):
@@ -192,7 +184,7 @@ def _llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
                 acc_until_last: tuple[NovaTextContent | NovaImageContent, ...] = acc[:-1]
 
                 last_content = acc[-1]
-                last_content.should_cache = True
+                last_content.cache_point = NovaCachePoint()
 
                 return (*acc_until_last, last_content)
 
