@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Sequence
+from functools import reduce
 from typing import Any, Literal, cast
 
 import boto3
@@ -11,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    CachePointContent,
     JSONContent,
     LLMDataContentType,
     LLMInferenceConfig,
@@ -57,7 +59,17 @@ CLAUDE_BEDROCK_MODEL_IDS = {
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
 
-class ClaudeTextContent(BaseModel):
+class ClaudeCacheControl(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["ephemeral"] = "ephemeral"
+
+
+class ClaudeCacheableContent(BaseModel):
+    cache_control: ClaudeCacheControl | None = Field(default=None)
+
+
+class ClaudeTextContent(ClaudeCacheableContent):
     """Claude text context model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -66,7 +78,7 @@ class ClaudeTextContent(BaseModel):
     text: str
 
 
-class ClaudeImageSource(BaseModel):
+class ClaudeImageSource(ClaudeCacheableContent):
     """An image encoded for communication with an LLM."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -76,7 +88,7 @@ class ClaudeImageSource(BaseModel):
     data: str
 
 
-class ClaudeImageContent(BaseModel):
+class ClaudeImageContent(ClaudeCacheableContent):
     """Claude text context model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -85,7 +97,7 @@ class ClaudeImageContent(BaseModel):
     source: ClaudeImageSource
 
 
-class ClaudeToolUseContent(BaseModel):
+class ClaudeToolUseContent(ClaudeCacheableContent):
     """Represents a tool use request from Claude."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -96,7 +108,7 @@ class ClaudeToolUseContent(BaseModel):
     name: str
 
 
-class ClaudeToolResultContent(BaseModel):
+class ClaudeToolResultContent(ClaudeCacheableContent):
     """Claude tool result model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -209,23 +221,46 @@ class ClaudeResponse(BaseModel):
 def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
     """Converts the generic LLM Message into a ClaudeMessage."""
 
-    def _handle_content(content: LLMMessageContentType) -> ClaudeMessageContentType:
+    def _handle_content(
+        acc: tuple[ClaudeMessageContentType, ...], content: LLMMessageContentType
+    ) -> tuple[ClaudeMessageContentType, ...]:
         match content:
             case TextContent():
-                return ClaudeTextContent(type="text", text=content.text)
+                return (
+                    *acc,
+                    ClaudeTextContent(text=content.text),
+                )
             case Base64ImageContent():
-                return ClaudeImageContent(
-                    source=ClaudeImageSource(media_type=content.media_type, data=content.data)
+                return (
+                    *acc,
+                    ClaudeImageContent(
+                        source=ClaudeImageSource(media_type=content.media_type, data=content.data)
+                    ),
                 )
             case LLMToolUseContent():
-                return ClaudeToolUseContent(id=content.id, name=content.name, input=content.input)
+                return (
+                    *acc,
+                    ClaudeToolUseContent(id=content.id, name=content.name, input=content.input),
+                )
             case LLMToolResultContent():
-                return _llm_tool_result_to_claude_tool_result(content)
+                return (*acc, _llm_tool_result_to_claude_tool_result(content))
+            case CachePointContent():
+                # If cache point is first element, drop it.
+                if len(acc) == 0:
+                    return acc
+
+                # Modify should cache of last element in Sequence
+                acc_until_last: tuple[ClaudeMessageContentType, ...] = acc[:-1]
+
+                last_content = acc[-1]
+                last_content.cache_control = ClaudeCacheControl()
+
+                return (*acc_until_last, last_content)
 
     if isinstance(msg.content, str):
-        content = [ClaudeTextContent(type="text", text=msg.content)]
+        content = [ClaudeTextContent(type="text", text=msg.content, cache_control=None)]
     else:
-        content = [_handle_content(subcontent) for subcontent in msg.content]
+        content = reduce(_handle_content, msg.content, ())
     return ClaudeMessage(role=msg.role, content=content)
 
 

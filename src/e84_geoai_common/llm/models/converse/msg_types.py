@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from e84_geoai_common.llm.models.converse.data_content_types import (
+    ConverseCachePoint,
     ConverseImageContent,
     ConverseTextContent,
 )
@@ -13,7 +14,11 @@ from e84_geoai_common.llm.models.converse.tool_use_types import (
 )
 
 ConverseMessageContentType = (
-    ConverseTextContent | ConverseImageContent | ConverseToolUseContent | ConverseToolResultContent
+    ConverseTextContent
+    | ConverseImageContent
+    | ConverseToolUseContent
+    | ConverseToolResultContent
+    | ConverseCachePoint
 )
 
 

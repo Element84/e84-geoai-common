@@ -3,11 +3,17 @@ from pathlib import Path
 
 from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
+    CachePointContent,
     LLMInferenceConfig,
     LLMMessage,
     TextContent,
 )
-from e84_geoai_common.llm.models.nova import BedrockNovaLLM
+from e84_geoai_common.llm.models.nova import (
+    BedrockNovaLLM,
+    NovaMessage,
+    NovaResponseOutput,
+    NovaTextContent,
+)
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     make_test_bedrock_runtime_client,
     nova_response_with_content,
@@ -84,3 +90,46 @@ def test_image_input() -> None:
     resp = llm.prompt([prompt_message], config)
 
     assert resp == LLMMessage(role="assistant", content="cat")
+
+
+def test_basic_usage_with_prompt_caching() -> None:
+    text_content = TextContent(text="Output the word hello backwards and only that.")
+    llm = BedrockNovaLLM(
+        client=make_test_bedrock_runtime_client([nova_response_with_content("olleh")])
+    )
+    config = LLMInferenceConfig()
+    resp = llm.prompt([LLMMessage(content=[text_content, CachePointContent()])], config)
+    expected_resp = LLMMessage(role="assistant", content="olleh")
+    assert resp == expected_resp
+
+
+def test_large_system_prompt() -> None:
+    """This test is most interesting as a live-test.
+
+    It validates that the cache control headers indicate that prompt caching actually worked.
+
+    It uses a large system prompt so that the minimum token limit is reached.
+    """
+    long_system_prompt_path = Path(__file__).parent / "long_system_prompt.txt"
+    with long_system_prompt_path.open(encoding="utf-8") as file:
+        system_prompt = file.read()
+
+        text_content = TextContent(text="Output the word hello backwards and only that.")
+        llm = BedrockNovaLLM(
+            client=make_test_bedrock_runtime_client([nova_response_with_content("olleh")]),
+        )
+        config = LLMInferenceConfig(system_prompt=system_prompt)
+        request = llm.create_request(
+            [LLMMessage(content=[text_content, CachePointContent()])], config
+        )
+        response = llm.invoke_model_with_request(request)
+
+        assert response.output == NovaResponseOutput(
+            message=NovaMessage(
+                role="assistant",
+                content=[NovaTextContent(text="olleh", cache_point=None)],
+            )
+        )
+
+        assert response.usage.cache_write_input_token_count is not None
+        assert response.usage.cache_write_input_token_count > 0

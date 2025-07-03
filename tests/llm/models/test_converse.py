@@ -7,6 +7,7 @@ from rich import print as rich_print
 
 from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
+    CachePointContent,
     JSONContent,
     LLMInferenceConfig,
     LLMMessage,
@@ -16,6 +17,10 @@ from e84_geoai_common.llm.core.llm import (
     TextContent,
 )
 from e84_geoai_common.llm.models.converse import BedrockConverseLLM
+from e84_geoai_common.llm.models.converse.converse import CONVERSE_BEDROCK_MODEL_IDS
+from e84_geoai_common.llm.models.converse.data_content_types import ConverseTextContent
+from e84_geoai_common.llm.models.converse.msg_types import ConverseAssistantMessage
+from e84_geoai_common.llm.models.converse.response_types import ConverseMessageResponse
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     _MockBedrockRuntimeClient,  # type: ignore[reportPrivateUsage]
     converse_response_with_content,
@@ -258,3 +263,60 @@ def test_tool_use_image() -> None:
         rich_print(resp)
 
     assert "cat" in resp.to_text_only().lower()
+
+
+def test_basic_usage_with_prompt_caching() -> None:
+    text_content = TextContent(text="Output the word hello backwards and only that.")
+    llm = BedrockConverseLLM(
+        client=make_test_bedrock_runtime_client([converse_response_with_content("olleh")])
+    )
+    config = LLMInferenceConfig()
+    resp = llm.prompt([LLMMessage(content=[text_content, CachePointContent()])], config)
+    expected_resp = LLMMessage(role="assistant", content=[TextContent(text="olleh")])
+    assert resp == expected_resp
+
+
+def test_large_system_prompt() -> None:
+    """This test is most interesting as a live-test.
+
+    It validates that the cache control headers indicate that prompt caching actually worked.
+
+    It uses a large system prompt so that the minimum token limit is reached.
+    """
+    long_system_prompt_path = Path(__file__).parent / "long_system_prompt.txt"
+    with long_system_prompt_path.open(encoding="utf-8") as file:
+        system_prompt = file.read()
+
+        text_content = TextContent(text="Output the word hello backwards and only that.")
+        llm = BedrockConverseLLM(
+            model_id=CONVERSE_BEDROCK_MODEL_IDS["Nova Pro"],
+            client=make_test_bedrock_runtime_client(
+                [
+                    converse_response_with_content(
+                        "olleh",
+                        {
+                            "usage": {
+                                "inputTokens": 123,
+                                "outputTokens": 321,
+                                "totalTokens": 444,
+                                "cacheReadInputTokens": 0,
+                                "cacheWriteInputTokens": 2500,
+                            }
+                        },
+                    )
+                ]
+            ),
+        )
+        config = LLMInferenceConfig(system_prompt=system_prompt)
+        request = llm.create_request(
+            [LLMMessage(content=[text_content, CachePointContent()])], config
+        )
+        response = llm.invoke_model_with_request(request)
+
+        assert response.output == ConverseMessageResponse(
+            message=ConverseAssistantMessage(
+                role="assistant", content=[ConverseTextContent(text="olleh")]
+            )
+        )
+        assert response.usage.cacheWriteInputTokens is not None
+        assert response.usage.cacheWriteInputTokens > 0

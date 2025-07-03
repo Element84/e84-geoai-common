@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    CachePointContent,
     JSONContent,
     LLMDataContentType,
     LLMInferenceConfig,
@@ -34,6 +35,7 @@ from e84_geoai_common.llm.models.claude import (
     CLAUDE_INSTANT,
 )
 from e84_geoai_common.llm.models.converse.data_content_types import (
+    ConverseCachePoint,
     ConverseImageContent,
     ConverseJSONContent,
     ConverseTextContent,
@@ -146,6 +148,16 @@ def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
     """Converts the generic LLM Message into a ConverseMessage."""
 
     def _handle_content(content: LLMMessageContentType) -> ConverseMessageContentType:
+        """Convert `LLMMessageContentType` to a list of `ConverseMessageContentType`.
+
+        This function returns a list the AWS Bedrock Converse API treats a
+        cache point as its own content type, whereas this library's API treats
+        it as a property of a content type.
+
+        If this function receives a content instance whose property indicates
+        it should request a cache point, it will return 2 content instances:
+        one with the content of the message, and another with the cache point.
+        """
         match content:
             case TextContent():
                 return ConverseTextContent(text=content.text)
@@ -157,13 +169,16 @@ def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
                         toolUseId=content.id, name=content.name, input=content.input
                     )
                 )
+
             case LLMToolResultContent():
                 return _llm_tool_result_to_converse_tool_result(content)
+            case CachePointContent():
+                return ConverseCachePoint()
 
     if isinstance(msg.content, str):
         content = [ConverseTextContent(text=msg.content)]
     else:
-        content = [_handle_content(subcontent) for subcontent in msg.content]
+        content = [_handle_content(content) for content in msg.content]
     return ConverseMessage(role=msg.role, content=content)
 
 

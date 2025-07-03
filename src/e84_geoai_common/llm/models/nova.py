@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Sequence
+from functools import reduce
 from typing import Literal, Self, cast
 
 import boto3
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    CachePointContent,
     LLMInferenceConfig,
     LLMMediaType,
     LLMMessage,
@@ -42,7 +44,17 @@ NOVA_BEDROCK_MODEL_IDS = {
 NovaImageFormat = Literal["jpeg", "png", "gif", "webp"]
 
 
-class NovaTextContent(BaseModel):
+class NovaCachePoint(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    type: Literal["default"] = "default"
+
+
+class NovaCacheableContent(BaseModel):
+    cache_point: NovaCachePoint | None = Field(default=None)
+
+
+class NovaTextContent(NovaCacheableContent):
     """Nova text context model."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -62,7 +74,7 @@ class NovaImageInnerContent(BaseModel):
     source: NovaImageSource
 
 
-class NovaImageContent(BaseModel):
+class NovaImageContent(NovaCacheableContent):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     image: NovaImageInnerContent
@@ -159,21 +171,35 @@ class NovaResponse(BaseModel):
 def _llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
     """Converts the generic LLM Message into a NovaMessage."""
 
-    def _handle_content(content: LLMMessageContentType) -> NovaTextContent | NovaImageContent:
+    def _handle_content(
+        acc: tuple[NovaTextContent | NovaImageContent, ...], content: LLMMessageContentType
+    ) -> tuple[NovaTextContent | NovaImageContent, ...]:
         match content:
             case TextContent():
-                return NovaTextContent(text=content.text)
+                return (*acc, NovaTextContent(text=content.text))
             case Base64ImageContent():
-                return NovaImageContent.from_b64_image_content(content)
+                return (*acc, NovaImageContent.from_b64_image_content(content))
             case LLMToolUseContent():
                 raise NotImplementedError
             case LLMToolResultContent():
                 raise NotImplementedError
+            case CachePointContent():
+                # If cache point is first element, drop it.
+                if len(acc) == 0:
+                    return acc
+
+                # Modify should cache of last element in Sequence
+                acc_until_last: tuple[NovaTextContent | NovaImageContent, ...] = acc[:-1]
+
+                last_content = acc[-1]
+                last_content.cache_point = NovaCachePoint()
+
+                return (*acc_until_last, last_content)
 
     if isinstance(msg.content, str):
         content = [NovaTextContent(text=msg.content)]
     else:
-        content = [_handle_content(subcontent) for subcontent in msg.content]
+        content = reduce(_handle_content, msg.content, ())
     return NovaMessage(role=msg.role, content=content)
 
 

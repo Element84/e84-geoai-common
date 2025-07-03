@@ -18,6 +18,8 @@ class ConverseUsageInfo(BaseModel):
     inputTokens: int
     outputTokens: int
     totalTokens: int
+    cacheReadInputTokens: int | None = Field(default=None)
+    cacheWriteInputTokens: int | None = Field(default=None)
 
 
 class ConverseMessageResponse(BaseModel):
