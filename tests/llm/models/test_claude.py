@@ -1,6 +1,8 @@
 import base64
 import json
+from contextlib import nullcontext as does_not_raise
 from pathlib import Path
+from textwrap import dedent
 
 from pydantic import BaseModel, Field
 from rich import print as rich_print
@@ -52,12 +54,12 @@ def test_with_response_prefix() -> None:
 
 
 def test_json_mode() -> None:
-    json_mode_prompt = """
+    json_mode_prompt = dedent("""
         Create a list of the numbers 1 through 5.
 
         Here's an example of the desired output for the number 2 through 6
         {"result": [2, 3, 4, 5, 6]}
-    """
+    """)
     llm = BedrockClaudeLLM(
         client=make_test_bedrock_runtime_client(
             [claude_response_with_content('"result": [1, 2, 3, 4, 5]}')]
@@ -71,6 +73,34 @@ def test_json_mode() -> None:
     content = resp.content[0]
     assert isinstance(content, TextContent)
     assert json.loads(content.text) == {"result": [1, 2, 3, 4, 5]}
+
+
+def test_json_mode_no_extra_text() -> None:
+    prompt = dedent("""
+        Generate some fake weather data as a JSON and then write a brief
+        weather report based on it.
+
+        Example JSON output:
+        {
+            "temperature_degC": 7,
+            "humidity_pct": 25,
+            "air_quality_index": 50
+        }
+    """)
+    stub_response = dedent("""
+        "temperature_degC": 7,
+        "humidity_pct": 25,
+        "air_quality_index": 50
+    }""")
+    llm = BedrockClaudeLLM(
+        client=make_test_bedrock_runtime_client([claude_response_with_content(stub_response)])
+    )
+    config = LLMInferenceConfig(json_mode=True)
+    resp = llm.prompt([LLMMessage(content=prompt)], config)
+
+    assert resp.role == "assistant"
+    with does_not_raise():
+        _ = json.loads(resp.to_text_only())
 
 
 def encode_image_to_base64_str(image_path: str | Path) -> str:
