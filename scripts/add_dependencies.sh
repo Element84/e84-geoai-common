@@ -1,10 +1,11 @@
 #!/bin/bash
 
 ####################################################################################################
-# Recreates the virtual environment with frozen dependencies.
+# Add dependencies to the virtual environment, using existing frozen dependencies.
 ####################################################################################################
 
-set -e -o pipefail
+set -eu -o pipefail
 
-rm -rf .venv
+uv add "$@"
+uv export --no-hashes --all-extras --format requirements-txt > requirements.txt
 uv sync --all-extras
