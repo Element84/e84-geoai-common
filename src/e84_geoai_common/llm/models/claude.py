@@ -331,7 +331,7 @@ def _llm_tool_result_to_claude_tool_result(
 
 def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
     if config.json_mode:
-        return "{"
+        return "<json>\n{"
     if config.response_prefix:
         return config.response_prefix
     return None
@@ -363,6 +363,15 @@ class BedrockClaudeLLM(LLM):
         if response_prefix:
             messages = [*messages, LLMMessage(role="assistant", content=response_prefix)]
 
+        # json_mode=True sets response prefix to: "<json>\n{", by setting
+        # </json> as a step sequence, we ensure that the generation stops as
+        # soon as the JSON ends. This solves the problem of the LLM outputting
+        # additional text after the JSON which breaks the JSON parsing.
+        # Note that stop sequences are not included in the LLM response, so we
+        # don't need any post-processing to remove this closing tag from the
+        # text.
+        stop_sequences = ["</json>"] if config.json_mode else None
+
         tools = None
         tool_choice = None
         if config.tools is not None:
@@ -377,6 +386,7 @@ class BedrockClaudeLLM(LLM):
             top_p=config.top_p,
             tools=tools,
             tool_choice=tool_choice,
+            stop_sequences=stop_sequences,
             messages=[_llm_message_to_claude_message(msg) for msg in messages],
         )
 
@@ -418,9 +428,11 @@ class BedrockClaudeLLM(LLM):
             match c:
                 case ClaudeTextContent():
                     text = c.text
-                    response_prefix = _config_to_response_prefix(inference_cfg)
-                    if index == 0 and response_prefix:
-                        text = response_prefix + text
+                    if index == 0:
+                        if inference_cfg.json_mode:
+                            text = "{" + text
+                        elif inference_cfg.response_prefix:
+                            text = inference_cfg.response_prefix + text
                     return TextContent(text=text)
                 case ClaudeImageContent():
                     return Base64ImageContent(media_type=c.source.media_type, data=c.source.data)
