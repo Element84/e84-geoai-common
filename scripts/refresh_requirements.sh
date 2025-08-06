@@ -6,10 +6,6 @@
 
 set -e -o pipefail
 
-uv pip compile \
-  --refresh \
-  --all-extras \
-  --upgrade \
-  pyproject.toml \
-  -o requirements.txt
-
+uv lock --upgrade
+uv export --no-hashes --all-extras --format requirements-txt > requirements.txt
+uv sync --all-extras
