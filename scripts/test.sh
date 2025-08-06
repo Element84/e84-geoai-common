@@ -15,7 +15,7 @@
 
 set -e -o pipefail
 
-USE_REAL_BEDROCK_CLIENT=false
+USE_REAL_BEDROCK_RUNTIME_CLIENT=false
 WATCH_MODE=false
 
 EXTRA_ARGS=()
@@ -23,7 +23,7 @@ EXTRA_ARGS=()
 for arg in "$@"; do
   case $arg in
     --use-real-bedrock-client)
-      USE_REAL_BEDROCK_CLIENT=true
+      USE_REAL_BEDROCK_RUNTIME_CLIENT=true
       shift
       ;;
     --watch)
@@ -35,7 +35,7 @@ for arg in "$@"; do
   esac
 done
 
-export USE_REAL_BEDROCK_CLIENT
+export USE_REAL_BEDROCK_RUNTIME_CLIENT
 export PYTHONPATH=src:tests
 
 if [[ "$WATCH_MODE" = true ]]; then
