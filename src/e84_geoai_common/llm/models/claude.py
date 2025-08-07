@@ -329,14 +329,6 @@ def _llm_tool_result_to_claude_tool_result(
     return out
 
 
-def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
-    if config.json_mode:
-        return "<json>\n{"
-    if config.response_prefix:
-        return config.response_prefix
-    return None
-
-
 class BedrockClaudeLLM(LLM):
     """Implements the LLM class for Bedrock Claude."""
 
@@ -359,18 +351,14 @@ class BedrockClaudeLLM(LLM):
     def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ClaudeInvokeLLMRequest:
-        response_prefix = _config_to_response_prefix(config)
-        if response_prefix:
-            messages = [*messages, LLMMessage(role="assistant", content=response_prefix)]
-
-        # json_mode=True sets response prefix to: "<json>\n{", by setting
-        # </json> as a step sequence, we ensure that the generation stops as
-        # soon as the JSON ends. This solves the problem of the LLM outputting
-        # additional text after the JSON which breaks the JSON parsing.
-        # Note that stop sequences are not included in the LLM response, so we
-        # don't need any post-processing to remove this closing tag from the
-        # text.
-        stop_sequences = ["</json>"] if config.json_mode else None
+        stop_sequences = None
+        if config.json_mode:
+            # https://docs.aws.amazon.com/nova/latest/userguide/prompting-structured-output.html
+            prefix = "```json\n{"
+            messages = [*messages, LLMMessage(role="assistant", content=prefix)]
+            stop_sequences = ["```"]
+        elif config.response_prefix:
+            messages = [*messages, LLMMessage(role="assistant", content=config.response_prefix)]
 
         tools = None
         tool_choice = None
@@ -430,7 +418,7 @@ class BedrockClaudeLLM(LLM):
                     text = c.text
                     if index == 0:
                         if inference_cfg.json_mode:
-                            text = "{" + text
+                            text = "{" + text.removesuffix("```")
                         elif inference_cfg.response_prefix:
                             text = inference_cfg.response_prefix + text
                     return TextContent(text=text)
