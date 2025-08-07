@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 LLMMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
@@ -174,7 +174,13 @@ class LLMInferenceConfig(BaseModel):
     top_k: int | None = Field(default=None, description="Top K for sampling")
     json_mode: bool = Field(
         default=False,
-        description="If True, forces model to only outputs valid JSON.",
+        description="If True, forces the model to only output valid JSON. "
+        "This is useful for generating structured output. "
+        "Note: this currently forces the response to begin as a JSON string "
+        "and ends the response as soon as the JSON string ends. As such, this "
+        "is not compatible with tools. In order to get both structured output "
+        "and tool use, consider other mechanisms such as XML tags or limiting "
+        "responses to tool calls exclusively.",
     )
     response_prefix: str | None = Field(
         default=None, description="Continue a pre-filled response instead of starting from scratch."
@@ -187,6 +193,12 @@ class LLMInferenceConfig(BaseModel):
         description="Whether the model should use a specific "
         "tool, or any tool, or decide by itself.",
     )
+
+    @model_validator(mode="after")
+    def _disallow_tools_with_json_mode(self) -> Self:
+        if self.json_mode and self.tools:
+            raise ValueError("json_mode is not supported with tools.")
+        return self
 
 
 class LLM(ABC):
