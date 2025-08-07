@@ -250,14 +250,6 @@ def _llm_tool_result_to_converse_tool_result(
     return out
 
 
-def _config_to_response_prefix(config: LLMInferenceConfig) -> str | None:
-    if config.json_mode:
-        return "{"
-    if config.response_prefix:
-        return config.response_prefix
-    return None
-
-
 class BedrockConverseLLM(LLM):
     """Implements the LLM class for Bedrock Converse."""
 
@@ -280,14 +272,19 @@ class BedrockConverseLLM(LLM):
     def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ConverseInvokeLLMRequest:
-        response_prefix = _config_to_response_prefix(config)
-        if response_prefix:
-            messages = [*messages, LLMMessage(role="assistant", content=response_prefix)]
+        stop_sequences = None
+        if config.json_mode:
+            # https://docs.aws.amazon.com/nova/latest/userguide/prompting-structured-output.html
+            prefix = "```json\n{"
+            messages = [*messages, LLMMessage(role="assistant", content=prefix)]
+            stop_sequences = ["```"]
+        elif config.response_prefix:
+            messages = [*messages, LLMMessage(role="assistant", content=config.response_prefix)]
+
         system = None
         if config.system_prompt:
             # For now, just support for a single system prompt content block
             system = [SystemContentBlock(text=config.system_prompt)]
-        stop_sequences = None  # stop sequence not implemented yet
 
         inference_config = ConverseInferenceConfig(
             maxTokens=config.max_tokens,
@@ -371,8 +368,7 @@ class BedrockConverseLLM(LLM):
         ):
             content = response_msg.content[0].text
             if inference_cfg.json_mode:
-                # In JSON mode we need to remove the JSON stop sequence
-                content = [TextContent(text="{" + content)]
+                content = [TextContent(text="{" + content.removesuffix("```"))]
             elif inference_cfg.response_prefix:
                 content = [TextContent(text=inference_cfg.response_prefix + content)]
             else:

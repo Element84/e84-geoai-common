@@ -229,7 +229,7 @@ class BedrockNovaLLM(LLM):
         stop_sequences = None
         if config.json_mode:
             # https://docs.aws.amazon.com/nova/latest/userguide/prompting-structured-output.html
-            prefix = "```json"
+            prefix = "```json\n{"
             messages = [*messages, LLMMessage(role="assistant", content=prefix)]
             stop_sequences = ["```"]
         elif config.response_prefix:
@@ -298,10 +298,9 @@ class BedrockNovaLLM(LLM):
         if len(response_msg.content) == 1 and isinstance(response_msg.content[0], NovaTextContent):
             content = response_msg.content[0].text
             if inference_cfg.json_mode:
-                # In JSON mode we need to remove the JSON stop sequence
-                content = content.removesuffix("```")
+                content = [TextContent(text="{" + content.removesuffix("```"))]
             elif inference_cfg.response_prefix:
-                content = inference_cfg.response_prefix + content
+                content = [TextContent(text=inference_cfg.response_prefix + content)]
         else:
             content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
 

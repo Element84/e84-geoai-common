@@ -1,6 +1,8 @@
 import base64
 import json
+from contextlib import nullcontext as does_not_raise
 from pathlib import Path
+from textwrap import dedent
 
 from pydantic import BaseModel, Field
 from rich import print as rich_print
@@ -59,16 +61,45 @@ def test_json_mode() -> None:
     """
     llm = BedrockConverseLLM(
         client=make_test_bedrock_runtime_client(
-            [converse_response_with_content('"result": [1, 2, 3, 4, 5]}')]
+            [converse_response_with_content('"result": [1, 2, 3, 4, 5]}\n')]
         )
     )
     config = LLMInferenceConfig(json_mode=True)
     resp = llm.prompt([LLMMessage(content=json_mode_prompt)], config)
+
     assert resp.role == "assistant"
     assert len(resp.content) == 1
     content = resp.content[0]
     assert isinstance(content, TextContent)
     assert json.loads(content.text) == {"result": [1, 2, 3, 4, 5]}
+
+
+def test_json_mode_no_extra_text() -> None:
+    prompt = dedent("""
+        Generate some fake weather data as a JSON and then write a brief
+        weather report based on it.
+
+        Example JSON output:
+        {
+            "temperature_degC": 7,
+            "humidity_pct": 25,
+            "air_quality_index": 50
+        }
+    """)
+    stub_response = dedent("""
+        "temperature_degC": 7,
+        "humidity_pct": 25,
+        "air_quality_index": 50
+    }""")
+    llm = BedrockConverseLLM(
+        client=make_test_bedrock_runtime_client([converse_response_with_content(stub_response)])
+    )
+    config = LLMInferenceConfig(json_mode=True)
+    resp = llm.prompt([LLMMessage(content=prompt)], config)
+
+    assert resp.role == "assistant"
+    with does_not_raise():
+        _ = json.loads(resp.to_text_only())
 
 
 # Unlike other SDK APIs, Converse API doesn't support base64 encoding of images

@@ -62,7 +62,7 @@ def test_json_mode() -> None:
     """)
     llm = BedrockClaudeLLM(
         client=make_test_bedrock_runtime_client(
-            [claude_response_with_content('"result": [1, 2, 3, 4, 5]}')]
+            [claude_response_with_content('"result": [1, 2, 3, 4, 5]}\n')]
         )
     )
     config = LLMInferenceConfig(json_mode=True)
