@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 
-from e84_geoai_common.llm.core.llm import LLM, LLMInferenceConfig, LLMTool
+from e84_geoai_common.llm.core.llm import LLM, ExecutableLLMTool, LLMInferenceConfig
 
 
-class Agent(ABC):
+class Agent[LLMToolContext](ABC):
     """A language model with instructions and tools."""
 
     llm: LLM
     inference_cfg: LLMInferenceConfig
-    tools: list[LLMTool]
+    tools: list[ExecutableLLMTool[LLMToolContext]]
 
     @property
     @abstractmethod

@@ -3,7 +3,7 @@ from contextlib import nullcontext as does_not_raise
 import pytest
 from pydantic import ValidationError
 
-from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMTool
+from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMToolDescription
 
 
 class TestLLMInferenceConfig:
@@ -14,12 +14,11 @@ class TestLLMInferenceConfig:
         with does_not_raise():
             _ = LLMInferenceConfig(json_mode=True, tools=[])
 
-        tool = LLMTool(
+        tool = LLMToolDescription(
             name="SomeTool",
             description="",
             input_model=None,
             output_model=None,
-            execution_func=None,
         )
         with pytest.raises(ValidationError):
             _ = LLMInferenceConfig(json_mode=True, tools=[tool])

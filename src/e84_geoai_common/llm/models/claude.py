@@ -18,8 +18,8 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMessage,
     LLMMessageContentType,
-    LLMTool,
     LLMToolChoice,
+    LLMToolDescription,
     LLMToolResultContent,
     LLMToolUseContent,
     TextContent,
@@ -264,7 +264,7 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
     return ClaudeMessage(role=msg.role, content=content)
 
 
-def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
+def _llm_tool_to_claude_tool(tool: LLMToolDescription) -> ClaudeTool:
     """Build a ClaudeTool from an LLMTool.
 
     If LLMTool.output_model is set, the JSON schema of the output model is
