@@ -5,6 +5,7 @@ from shapely import (
     GeometryCollection,
     LineString,
     MultiLineString,
+    MultiPoint,
     MultiPolygon,
     Point,
     count_coordinates,
@@ -14,6 +15,7 @@ from shapely.geometry.polygon import Polygon
 from shapely.validation import explain_validity
 
 from e84_geoai_common.geometry import (
+    geometry_to_polygon,
     remove_extraneous_geoms,
     simplify_geometry,
 )
@@ -222,3 +224,81 @@ def test_simplify_geometry():
     assert simplify_geometry(polygon, 300) == polygon
 
     assert count_coordinates(simplify_geometry(polygon, 199)) <= 199
+
+
+# A simple ascii art drawing for another set of sample polygons
+# 12   ************     ******
+#      *  A       *     * B  *
+# 10   *     ******     ******        *
+#      *     *                       /
+#      *     *                      / E
+# 7    *     ******       D        *
+#      *          *       *
+# 5    *     ******
+#      *     *
+# 3    *     ******     ******
+#      *          *     * C  *
+# 1    ************     ******
+#      4     9    11    13  15    17  19
+
+
+def test_geometry_to_polygon():
+    a_polygon = Polygon(
+        [
+            (4, 1),
+            (11, 1),
+            (11, 3),
+            (9, 3),
+            (9, 5),
+            (11, 5),
+            (11, 7),
+            (9, 7),
+            (9, 10),
+            (11, 10),
+            (11, 12),
+            (4, 12),
+            (4, 1),
+        ]
+    )
+
+    b_polygon = Polygon([(13, 10), (15, 10), (15, 12), (13, 12), (13, 10)])
+    c_polygon = Polygon([(13, 1), (15, 1), (15, 3), (13, 3), (13, 1)])
+    c_bottom_line = LineString([(13, 1), (15, 1)])
+
+    d_point = Point(14, 6)
+    e_line = LineString([(19, 10), (17, 7)])
+    e1_point = Point(19, 10)
+    e2_point = Point(17, 7)
+
+    ab_multipolygon = MultiPolygon([a_polygon, b_polygon])
+    ab_convex_hull = Polygon([(4, 1), (11, 1), (15, 10), (15, 12), (4, 12), (4, 1)])
+
+    abcde_collection = GeometryCollection([a_polygon, b_polygon, c_polygon, d_point, e_line])
+    abcde_convex_hull = Polygon([(4, 1), (15, 1), (19, 10), (15, 12), (4, 12), (4, 1)])
+
+    # A single polygon is returned
+    assert geometry_to_polygon(a_polygon) == a_polygon
+
+    # Multipolygon convex hull is used
+    assert geometry_to_polygon(ab_multipolygon).equals(ab_convex_hull)
+
+    # Point adds a buffer
+    assert geometry_to_polygon(d_point) == d_point.buffer(1)
+    # Line string adds a buffer
+    assert geometry_to_polygon(e_line) == e_line.buffer(1)
+
+    # Geometry collection is convex hull
+    assert geometry_to_polygon(abcde_collection).equals(abcde_convex_hull)
+
+    # Multipoints
+    de_multipoint = MultiPoint([d_point, e1_point, e2_point])
+    e_multipoint = MultiPoint([e1_point, e2_point])
+
+    # Convex hull turns into a polygon
+    assert geometry_to_polygon(de_multipoint).equals(Polygon([d_point, e1_point, e2_point]))
+    # Convex hull turns into a line string
+    assert geometry_to_polygon(e_multipoint).equals(LineString([e1_point, e2_point]).buffer(1))
+
+    # MultiLinestring
+    ce_multiline = MultiLineString([c_bottom_line, e_line])
+    assert geometry_to_polygon(ce_multiline).equals(Polygon([(13, 1), (15, 1), (19, 10), (13, 1)]))

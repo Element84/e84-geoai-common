@@ -66,6 +66,31 @@ def geometry_to_geojson(geom: BaseGeometry) -> str:
     return json.dumps(geom.__geo_interface__)
 
 
+def geometry_to_polygon(geom: BaseGeometry) -> Polygon:
+    """Convert any geometry to a Polygon.
+
+    If the geometry is already a Polygon, return it as-is.
+    If it's a Point, LineString, or other geometry type, return its convex hull.
+    If it's a MultiPolygon, return the union of all polygons.
+    """
+    if isinstance(geom, Polygon):
+        return geom
+    if isinstance(geom, GeometryCollection):
+        geom = geom.convex_hull
+        if isinstance(geom, GeometryCollection):
+            gc = cast("GeometryCollection[Polygon]", geom)
+            if len(gc.geoms) != 1:
+                raise RuntimeError("Could not create convex hull of geometry collection")
+            geom = gc.geoms[0]
+    if isinstance(geom, (MultiPolygon, MultiPoint, MultiLineString)):
+        geom = geom.convex_hull
+    if isinstance(geom, (Point, LineString)):
+        geom = geom.buffer(1)
+    if not isinstance(geom, Polygon):
+        raise RuntimeError(f"Unable to create polygon from geometry of type [{type(geom)}]")  # noqa: TRY004
+    return geom
+
+
 def combine_geometry(geoms: list[BaseGeometry]) -> BaseGeometry:
     """Combines geometry into a single collection type."""
     if len(geoms) == 0:
