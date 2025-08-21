@@ -45,8 +45,7 @@ dev = [
   "build>=1.2.2",
   "pre-commit>=3.8.0",
   "pre-commit-hooks>=4.6.0",
-  "moto[s3]>=5.0.0",
-]
+  "moto[s3]>=5.0.0"]
 
 
 [tool.pyright]

@@ -10,6 +10,7 @@ from rich import print as rich_print
 from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
     CachePointContent,
+    ExecutableLLMTool,
     JSONContent,
     LLMInferenceConfig,
     LLMMessage,
@@ -154,18 +155,22 @@ def test_tool_use_json() -> None:
         temperature: float = Field(description="Temperature in Celsius")
         humidity: float = Field(description="Humidity %.")
 
-    def exec_weather_tool(tool_use_request: LLMToolUseContent) -> LLMToolResultContent:
+    def exec_weather_tool(
+        context: None, tool_use_request: LLMToolUseContent
+    ) -> LLMToolResultContent:
         weather_info = WeatherInfo(weather_description="Sunny", temperature=20, humidity=50)
         tool_result = LLMToolResultContent(
             id=tool_use_request.id, content=[JSONContent(data=weather_info.model_dump())]
         )
         return tool_result
 
-    tool = LLMTool(
-        name="GetWeatherInfo",
-        description="Get current weather info for a place.",
-        input_model=GetWeatherInfoInput,
-        output_model=WeatherInfo,
+    tool = ExecutableLLMTool(
+        tool_spec=LLMTool(
+            name="GetWeatherInfo",
+            description="Get current weather info for a place.",
+            input_model=GetWeatherInfoInput,
+            output_model=WeatherInfo,
+        ),
         execution_func=exec_weather_tool,
     )
 
@@ -193,7 +198,7 @@ def test_tool_use_json() -> None:
     ]
     client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockConverseLLM(client=client)
-    config = LLMInferenceConfig(tools=[tool])
+    config = LLMInferenceConfig(tools=[tool.tool_spec])
 
     # test tool use
     messages = [LLMMessage(content=prompt)]
@@ -206,12 +211,12 @@ def test_tool_use_json() -> None:
     assert isinstance(resp.content, list)
     tool_use_req = resp.content[-1]
     assert isinstance(tool_use_req, LLMToolUseContent)
-    assert tool_use_req.name == tool.name
+    assert tool_use_req.name == tool.tool_spec.name
     tool_inputs = GetWeatherInfoInput.model_validate(tool_use_req.input)
     assert "philadelphia" in tool_inputs.place.lower()
 
     # test tool result
-    tool_result = tool.execute(tool_use_req)
+    tool_result = tool.execute(None, tool_use_req)
     messages = [*messages, resp, LLMMessage(content=[tool_result])]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
@@ -229,18 +234,22 @@ def test_tool_use_image() -> None:
     class ImageGeneratorInput(BaseModel):
         description: str = Field(description="Description of the image to generate.")
 
-    def exec_image_gen_tool(tool_use_request: LLMToolUseContent) -> LLMToolResultContent:
+    def exec_image_gen_tool(
+        context: None, tool_use_request: LLMToolUseContent
+    ) -> LLMToolResultContent:
         image_path = str(Path(__file__).parent / "images/cat.webp")
         base64_string = encode_image_to_base64_str(image_path)
         image_content = Base64ImageContent(media_type="image/webp", data=base64_string)
         tool_result = LLMToolResultContent(id=tool_use_request.id, content=[image_content])
         return tool_result
 
-    tool = LLMTool(
-        name="GenerateImage",
-        description="Generate an image from text. Returns the generated image only.",
-        input_model=ImageGeneratorInput,
-        output_model=None,
+    tool = ExecutableLLMTool(
+        tool_spec=LLMTool(
+            name="GenerateImage",
+            description="Generate an image from text. Returns the generated image only.",
+            input_model=ImageGeneratorInput,
+            output_model=None,
+        ),
         execution_func=exec_image_gen_tool,
     )
 
@@ -268,7 +277,7 @@ def test_tool_use_image() -> None:
     ]
     client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockConverseLLM(client=client)
-    config = LLMInferenceConfig(tools=[tool])
+    config = LLMInferenceConfig(tools=[tool.tool_spec])
 
     # test tool use
     messages = [LLMMessage(content=prompt)]
@@ -281,11 +290,11 @@ def test_tool_use_image() -> None:
     assert isinstance(resp.content, list)
     tool_use_req = resp.content[-1]
     assert isinstance(tool_use_req, LLMToolUseContent)
-    assert tool_use_req.name == tool.name
+    assert tool_use_req.name == tool.tool_spec.name
     _ = ImageGeneratorInput.model_validate(tool_use_req.input)
 
     # test tool result
-    tool_result = tool.execute(tool_use_req)
+    tool_result = tool.execute(None, tool_use_req)
     messages = [*messages, resp, LLMMessage(content=[tool_result])]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 

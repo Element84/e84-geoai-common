@@ -19,7 +19,6 @@ class TestLLMInferenceConfig:
             description="",
             input_model=None,
             output_model=None,
-            execution_func=None,
         )
         with pytest.raises(ValidationError):
             _ = LLMInferenceConfig(json_mode=True, tools=[tool])

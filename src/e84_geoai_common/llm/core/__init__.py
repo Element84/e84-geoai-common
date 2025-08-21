@@ -4,6 +4,7 @@ from e84_geoai_common.llm.core.agent import Agent
 from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
+    ExecutableLLMTool,
     JSONContent,
     LLMDataContentType,
     LLMInferenceConfig,
@@ -21,6 +22,7 @@ __all__ = [
     "LLM",
     "Agent",
     "Base64ImageContent",
+    "ExecutableLLMTool",
     "JSONContent",
     "LLMDataContentType",
     "LLMInferenceConfig",
