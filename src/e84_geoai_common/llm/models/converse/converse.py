@@ -18,8 +18,8 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMessage,
     LLMMessageContentType,
+    LLMTool,
     LLMToolChoice,
-    LLMToolDescription,
     LLMToolResultContent,
     LLMToolUseContent,
     TextContent,
@@ -182,7 +182,7 @@ def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
     return ConverseMessage(role=msg.role, content=content)
 
 
-def _llm_tool_to_converse_tool(tool: LLMToolDescription) -> ConverseSingleTool:
+def _llm_tool_to_converse_tool(tool: LLMTool) -> ConverseSingleTool:
     """Build a ConverseSingleTool from an LLMTool.
 
     If LLMTool.output_model is set, the JSON schema of the output model is

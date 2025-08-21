@@ -95,7 +95,7 @@ class LLMMessage(BaseModel):
         return " ".join(parts)
 
 
-class LLMToolDescription(BaseModel):
+class LLMTool(BaseModel):
     """Definition of a tool that an LLM may use."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -122,7 +122,7 @@ class ExecutableLLMTool[LLMToolContext](BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    tool_desc: LLMToolDescription
+    tool_def: LLMTool
 
     execution_func: ExecutableFunction[LLMToolContext] = Field(
         exclude=True,
@@ -145,7 +145,7 @@ class ExecutableLLMTool[LLMToolContext](BaseModel):
         if tool_result.id != tool_use_request.id:
             msg = (
                 (
-                    f"Tool result ID does not match tool call ID for tool {self.tool_desc.name} for"
+                    f"Tool result ID does not match tool call ID for tool {self.tool_def.name} for"
                     " input: "
                 ),
                 f"{tool_use_request.input}.",
@@ -201,7 +201,7 @@ class LLMInferenceConfig(BaseModel):
     response_prefix: str | None = Field(
         default=None, description="Continue a pre-filled response instead of starting from scratch."
     )
-    tools: list[LLMToolDescription] | None = Field(
+    tools: list[LLMTool] | None = Field(
         default=None, description="List of tools that the model may call."
     )
     tool_choice: LLMToolChoice | None = Field(

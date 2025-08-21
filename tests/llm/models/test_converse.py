@@ -14,7 +14,7 @@ from e84_geoai_common.llm.core.llm import (
     JSONContent,
     LLMInferenceConfig,
     LLMMessage,
-    LLMToolDescription,
+    LLMTool,
     LLMToolResultContent,
     LLMToolUseContent,
     TextContent,
@@ -165,7 +165,7 @@ def test_tool_use_json() -> None:
         return tool_result
 
     tool = ExecutableLLMTool(
-        tool_desc=LLMToolDescription(
+        tool_def=LLMTool(
             name="GetWeatherInfo",
             description="Get current weather info for a place.",
             input_model=GetWeatherInfoInput,
@@ -198,7 +198,7 @@ def test_tool_use_json() -> None:
     ]
     client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockConverseLLM(client=client)
-    config = LLMInferenceConfig(tools=[tool.tool_desc])
+    config = LLMInferenceConfig(tools=[tool.tool_def])
 
     # test tool use
     messages = [LLMMessage(content=prompt)]
@@ -211,7 +211,7 @@ def test_tool_use_json() -> None:
     assert isinstance(resp.content, list)
     tool_use_req = resp.content[-1]
     assert isinstance(tool_use_req, LLMToolUseContent)
-    assert tool_use_req.name == tool.tool_desc.name
+    assert tool_use_req.name == tool.tool_def.name
     tool_inputs = GetWeatherInfoInput.model_validate(tool_use_req.input)
     assert "philadelphia" in tool_inputs.place.lower()
 
@@ -244,7 +244,7 @@ def test_tool_use_image() -> None:
         return tool_result
 
     tool = ExecutableLLMTool(
-        tool_desc=LLMToolDescription(
+        tool_def=LLMTool(
             name="GenerateImage",
             description="Generate an image from text. Returns the generated image only.",
             input_model=ImageGeneratorInput,
@@ -277,7 +277,7 @@ def test_tool_use_image() -> None:
     ]
     client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockConverseLLM(client=client)
-    config = LLMInferenceConfig(tools=[tool.tool_desc])
+    config = LLMInferenceConfig(tools=[tool.tool_def])
 
     # test tool use
     messages = [LLMMessage(content=prompt)]
@@ -290,7 +290,7 @@ def test_tool_use_image() -> None:
     assert isinstance(resp.content, list)
     tool_use_req = resp.content[-1]
     assert isinstance(tool_use_req, LLMToolUseContent)
-    assert tool_use_req.name == tool.tool_desc.name
+    assert tool_use_req.name == tool.tool_def.name
     _ = ImageGeneratorInput.model_validate(tool_use_req.input)
 
     # test tool result
