@@ -122,7 +122,7 @@ class ExecutableLLMTool[LLMToolContext](BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    tool_def: LLMTool
+    tool_spec: LLMTool
 
     execution_func: ExecutableFunction[LLMToolContext] = Field(
         exclude=True,
@@ -145,7 +145,7 @@ class ExecutableLLMTool[LLMToolContext](BaseModel):
         if tool_result.id != tool_use_request.id:
             msg = (
                 (
-                    f"Tool result ID does not match tool call ID for tool {self.tool_def.name} for"
+                    f"Tool result ID does not match tool call ID for tool {self.tool_spec.name} for"
                     " input: "
                 ),
                 f"{tool_use_request.input}.",

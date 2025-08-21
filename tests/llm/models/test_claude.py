@@ -162,7 +162,7 @@ def test_tool_use_json() -> None:
         return tool_result
 
     tool = ExecutableLLMTool(
-        tool_def=LLMTool(
+        tool_spec=LLMTool(
             name="GetWeatherInfo",
             description="Get current weather info for a place.",
             input_model=GetWeatherInfoInput,
@@ -193,7 +193,7 @@ def test_tool_use_json() -> None:
     ]
     client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockClaudeLLM(client=client)
-    config = LLMInferenceConfig(tools=[tool.tool_def])
+    config = LLMInferenceConfig(tools=[tool.tool_spec])
 
     # test tool use
     messages = [LLMMessage(content=prompt)]
@@ -206,7 +206,7 @@ def test_tool_use_json() -> None:
     assert isinstance(resp.content, list)
     tool_use_req = resp.content[-1]
     assert isinstance(tool_use_req, LLMToolUseContent)
-    assert tool_use_req.name == tool.tool_def.name
+    assert tool_use_req.name == tool.tool_spec.name
     tool_inputs = GetWeatherInfoInput.model_validate(tool_use_req.input)
     assert "philadelphia" in tool_inputs.place.lower()
 
@@ -239,7 +239,7 @@ def test_tool_use_image() -> None:
         return tool_result
 
     tool = ExecutableLLMTool(
-        tool_def=LLMTool(
+        tool_spec=LLMTool(
             name="GenerateImage",
             description="Generate an image from text. Returns the generated image only.",
             input_model=ImageGeneratorInput,
@@ -270,7 +270,7 @@ def test_tool_use_image() -> None:
     ]
     client = make_test_bedrock_runtime_client(dummy_responses)
     llm = BedrockClaudeLLM(client=client)
-    config = LLMInferenceConfig(tools=[tool.tool_def])
+    config = LLMInferenceConfig(tools=[tool.tool_spec])
 
     # test tool use
     messages = [LLMMessage(content=prompt)]
@@ -283,7 +283,7 @@ def test_tool_use_image() -> None:
     assert isinstance(resp.content, list)
     tool_use_req = resp.content[-1]
     assert isinstance(tool_use_req, LLMToolUseContent)
-    assert tool_use_req.name == tool.tool_def.name
+    assert tool_use_req.name == tool.tool_spec.name
     _ = ImageGeneratorInput.model_validate(tool_use_req.input)
 
     # test tool result
