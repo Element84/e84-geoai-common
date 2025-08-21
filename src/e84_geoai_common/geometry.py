@@ -66,12 +66,11 @@ def geometry_to_geojson(geom: BaseGeometry) -> str:
     return json.dumps(geom.__geo_interface__)
 
 
-def geometry_to_polygon(geom: BaseGeometry) -> Polygon:
+def geometry_to_polygon(geom: BaseGeometry, buffer_dist: int = 1) -> Polygon:
     """Convert any geometry to a Polygon.
 
-    If the geometry is already a Polygon, return it as-is.
-    If it's a Point, LineString, or other geometry type, return its convex hull.
-    If it's a MultiPolygon, return the union of all polygons.
+    It works by finding the convex hull if the geometry is one of the collection types. Single
+    points and line strings have a buffer added to them.
     """
     if isinstance(geom, Polygon):
         return geom
@@ -85,7 +84,7 @@ def geometry_to_polygon(geom: BaseGeometry) -> Polygon:
     if isinstance(geom, (MultiPolygon, MultiPoint, MultiLineString)):
         geom = geom.convex_hull
     if isinstance(geom, (Point, LineString)):
-        geom = geom.buffer(1)
+        geom = geom.buffer(buffer_dist)
     if not isinstance(geom, Polygon):
         raise RuntimeError(f"Unable to create polygon from geometry of type [{type(geom)}]")  # noqa: TRY004
     return geom

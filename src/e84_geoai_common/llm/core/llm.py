@@ -118,7 +118,7 @@ ExecutableFunction = Callable[[LLMToolContext, LLMToolUseContent], LLMToolResult
 
 
 class ExecutableLLMTool[LLMToolContext](BaseModel):
-    """TODO."""
+    """The executable version of a tool."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
