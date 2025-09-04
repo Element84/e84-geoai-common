@@ -14,6 +14,7 @@ from e84_geoai_common.llm.core.llm import (
     JSONContent,
     LLMInferenceConfig,
     LLMMessage,
+    LLMMessageMetadata,
     LLMTool,
     LLMToolResultContent,
     LLMToolUseContent,
@@ -39,7 +40,11 @@ def test_basic_usage() -> None:
     resp = llm.prompt(
         [LLMMessage(content="Output the word hello backwards and only that.")], config
     )
-    assert resp == LLMMessage(role="assistant", content=[TextContent(text="olleh")])
+    assert resp == LLMMessage(
+        role="assistant",
+        content=[TextContent(text="olleh")],
+        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+    )
 
 
 def test_with_response_prefix() -> None:
@@ -50,7 +55,11 @@ def test_with_response_prefix() -> None:
     resp = llm.prompt(
         [LLMMessage(content="Output the sum of 5 and 10 without additional explanation")], config
     )
-    assert resp == LLMMessage(role="assistant", content=[TextContent(text="5 + 10 =  15")])
+    assert resp == LLMMessage(
+        role="assistant",
+        content=[TextContent(text="5 + 10 =  15")],
+        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+    )
 
 
 def test_json_mode() -> None:
@@ -137,7 +146,11 @@ def test_image_input() -> None:
 
     resp = llm.prompt([prompt_message], config)
 
-    assert resp == LLMMessage(role="assistant", content=[TextContent(text="cat")])
+    assert resp == LLMMessage(
+        role="assistant",
+        content=[TextContent(text="cat")],
+        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+    )
 
 
 def test_tool_use_json() -> None:
@@ -312,7 +325,11 @@ def test_basic_usage_with_prompt_caching() -> None:
     )
     config = LLMInferenceConfig()
     resp = llm.prompt([LLMMessage(content=[text_content, CachePointContent()])], config)
-    expected_resp = LLMMessage(role="assistant", content=[TextContent(text="olleh")])
+    expected_resp = LLMMessage(
+        role="assistant",
+        content=[TextContent(text="olleh")],
+        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+    )
     assert resp == expected_resp
 
 
@@ -337,7 +354,7 @@ def test_large_system_prompt() -> None:
                         {
                             "usage": {
                                 "inputTokens": 123,
-                                "outputTokens": 321,
+                                "outputTokens": 123,
                                 "totalTokens": 444,
                                 "cacheReadInputTokens": 0,
                                 "cacheWriteInputTokens": 2500,
