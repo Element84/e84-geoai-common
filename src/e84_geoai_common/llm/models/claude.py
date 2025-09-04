@@ -18,6 +18,7 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMessage,
     LLMMessageContentType,
+    LLMMessageMetadata,
     LLMTool,
     LLMToolChoice,
     LLMToolResultContent,
@@ -430,4 +431,9 @@ class BedrockClaudeLLM(LLM):
         return LLMMessage(
             role="assistant",
             content=[_to_llm_content(i, c) for i, c in enumerate(response.content)],
+            metadata=LLMMessageMetadata(
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                stop_reason=response.stop_reason,
+            ),
         )

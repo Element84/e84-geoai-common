@@ -16,6 +16,7 @@ from e84_geoai_common.llm.core.llm import (
     LLMMediaType,
     LLMMessage,
     LLMMessageContentType,
+    LLMMessageMetadata,
     LLMToolResultContent,
     LLMToolUseContent,
     TextContent,
@@ -304,7 +305,15 @@ class BedrockNovaLLM(LLM):
         else:
             content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
 
-        return LLMMessage(role="assistant", content=content)
+        return LLMMessage(
+            role="assistant",
+            content=content,
+            metadata=LLMMessageMetadata(
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                stop_reason=response.stop_reason,
+            ),
+        )
 
 
 #########################

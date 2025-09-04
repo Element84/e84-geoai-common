@@ -68,6 +68,16 @@ LLMMessageContentType = (
 )
 
 
+class LLMMessageMetadata(BaseModel):
+    """Metadata associated with the message."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    input_tokens: int
+    output_tokens: int
+    stop_reason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
+
+
 class LLMMessage(BaseModel):
     """Standard representation of an LLM message.
 
@@ -79,6 +89,7 @@ class LLMMessage(BaseModel):
 
     role: Literal["assistant", "user"] = "user"
     content: str | Sequence[LLMMessageContentType]
+    metadata: LLMMessageMetadata | None = Field(default=None, exclude=True)
 
     def to_text_only(self) -> str:
         """Returns the message as text.

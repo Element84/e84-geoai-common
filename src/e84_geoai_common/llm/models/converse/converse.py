@@ -18,6 +18,7 @@ from e84_geoai_common.llm.core.llm import (
     LLMInferenceConfig,
     LLMMessage,
     LLMMessageContentType,
+    LLMMessageMetadata,
     LLMTool,
     LLMToolChoice,
     LLMToolResultContent,
@@ -375,7 +376,15 @@ class BedrockConverseLLM(LLM):
                 content = [TextContent(text=content)]
         else:
             content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
-        return LLMMessage(role=response_msg.role, content=content)
+        return LLMMessage(
+            role=response_msg.role,
+            content=content,
+            metadata=LLMMessageMetadata(
+                input_tokens=response.usage.inputTokens,
+                output_tokens=response.usage.outputTokens,
+                stop_reason=response.stopReason,
+            ),
+        )
 
     def _make_client_request(self, request: ConverseInvokeLLMRequest) -> ConverseResponseTypeDef:
         """Make model invocation request and return raw JSON response."""
