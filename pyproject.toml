@@ -63,7 +63,6 @@ reportUnknownArgumentType = "error"
 reportUnknownMemberType = "error"
 reportUnknownVariableType = "error"
 reportUnnecessaryComparison = "error"
-reportIncompatibleVariableOverride = "none"
 
 [tool.ruff]
 line-length = 100
