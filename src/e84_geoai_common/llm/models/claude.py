@@ -14,11 +14,12 @@ from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
     CachePointContent,
     JSONContent,
+    LLMAssistantMessage,
     LLMDataContentType,
     LLMInferenceConfig,
     LLMMessage,
     LLMMessageContentType,
-    LLMMessageMetadata,
+    LLMResponseMetadata,
     LLMTool,
     LLMToolChoice,
     LLMToolResultContent,
@@ -384,7 +385,7 @@ class BedrockClaudeLLM(LLM):
         self,
         messages: Sequence[LLMMessage],
         inference_cfg: LLMInferenceConfig,
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         """Prompt the LLM with a message and optional conversation history."""
         if len(messages) == 0:
             raise ValueError("Must specify at least one message.")
@@ -410,7 +411,7 @@ class BedrockClaudeLLM(LLM):
 
     def _response_to_llm_message(
         self, response: ClaudeResponse, inference_cfg: LLMInferenceConfig
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         def _to_llm_content(
             index: int, c: ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent
         ) -> TextContent | Base64ImageContent | LLMToolUseContent:
@@ -428,10 +429,9 @@ class BedrockClaudeLLM(LLM):
                 case ClaudeToolUseContent():
                     return LLMToolUseContent(id=c.id, name=c.name, input=c.input)
 
-        return LLMMessage(
-            role="assistant",
+        return LLMAssistantMessage(
             content=[_to_llm_content(i, c) for i, c in enumerate(response.content)],
-            metadata=LLMMessageMetadata(
+            metadata=LLMResponseMetadata(
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 stop_reason=response.stop_reason,

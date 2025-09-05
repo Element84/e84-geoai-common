@@ -12,11 +12,12 @@ from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
     CachePointContent,
+    LLMAssistantMessage,
     LLMInferenceConfig,
     LLMMediaType,
     LLMMessage,
     LLMMessageContentType,
-    LLMMessageMetadata,
+    LLMResponseMetadata,
     LLMToolResultContent,
     LLMToolUseContent,
     TextContent,
@@ -252,7 +253,7 @@ class BedrockNovaLLM(LLM):
         self,
         messages: Sequence[LLMMessage],
         inference_cfg: LLMInferenceConfig,
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         """Prompt the LLM with a message and optional conversation history."""
         if len(messages) == 0:
             msg = "Must specify at least one message."
@@ -281,7 +282,7 @@ class BedrockNovaLLM(LLM):
 
     def _response_to_llm_message(
         self, response: NovaResponse, inference_cfg: LLMInferenceConfig
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         def _to_llm_content(
             index: int,
             c: NovaTextContent | NovaImageContent,
@@ -305,10 +306,10 @@ class BedrockNovaLLM(LLM):
         else:
             content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
 
-        return LLMMessage(
+        return LLMAssistantMessage(
             role="assistant",
             content=content,
-            metadata=LLMMessageMetadata(
+            metadata=LLMResponseMetadata(
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 stop_reason=response.stop_reason,

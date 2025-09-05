@@ -7,9 +7,10 @@ from textwrap import dedent
 from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
     CachePointContent,
+    LLMAssistantMessage,
     LLMInferenceConfig,
-    LLMMessage,
-    LLMMessageMetadata,
+    LLMResponseMetadata,
+    LLMUserMessage,
     TextContent,
 )
 from e84_geoai_common.llm.models.nova import (
@@ -30,12 +31,11 @@ def test_basic_usage() -> None:
     )
     config = LLMInferenceConfig()
     resp = llm.prompt(
-        [LLMMessage(content="Output the word hello backwards and only that.")], config
+        [LLMUserMessage(content="Output the word hello backwards and only that.")], config
     )
-    assert resp == LLMMessage(
-        role="assistant",
+    assert resp == LLMAssistantMessage(
         content="olleh",
-        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
     )
 
 
@@ -45,12 +45,12 @@ def test_with_response_prefix() -> None:
     )
     config = LLMInferenceConfig(response_prefix="5 + 10 = ")
     resp = llm.prompt(
-        [LLMMessage(content="Output the sum of 5 and 10 without additional explanation")], config
+        [LLMUserMessage(content="Output the sum of 5 and 10 without additional explanation")],
+        config,
     )
-    assert resp == LLMMessage(
-        role="assistant",
+    assert resp == LLMAssistantMessage(
         content=[TextContent(text="5 + 10 = 15")],
-        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
     )
 
 
@@ -67,7 +67,7 @@ def test_json_mode() -> None:
         )
     )
     config = LLMInferenceConfig(json_mode=True)
-    resp = llm.prompt([LLMMessage(content=json_mode_prompt)], config)
+    resp = llm.prompt([LLMUserMessage(content=json_mode_prompt)], config)
 
     assert resp.role == "assistant"
     assert len(resp.content) == 1
@@ -97,7 +97,7 @@ def test_json_mode_no_extra_text() -> None:
         client=make_test_bedrock_runtime_client([nova_response_with_content(stub_response)])
     )
     config = LLMInferenceConfig(json_mode=True)
-    resp = llm.prompt([LLMMessage(content=prompt)], config)
+    resp = llm.prompt([LLMUserMessage(content=prompt)], config)
 
     assert resp.role == "assistant"
     with does_not_raise():
@@ -128,19 +128,15 @@ def test_image_input() -> None:
     """
     )
 
-    prompt_message = LLMMessage(
-        role="user",
-        content=[prompt_text, image_content],
-    )
+    prompt_message = LLMUserMessage(content=[prompt_text, image_content])
 
     config = LLMInferenceConfig()
 
     resp = llm.prompt([prompt_message], config)
 
-    assert resp == LLMMessage(
-        role="assistant",
+    assert resp == LLMAssistantMessage(
         content="cat",
-        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
     )
 
 
@@ -150,11 +146,10 @@ def test_basic_usage_with_prompt_caching() -> None:
         client=make_test_bedrock_runtime_client([nova_response_with_content("olleh")])
     )
     config = LLMInferenceConfig()
-    resp = llm.prompt([LLMMessage(content=[text_content, CachePointContent()])], config)
-    expected_resp = LLMMessage(
-        role="assistant",
+    resp = llm.prompt([LLMUserMessage(content=[text_content, CachePointContent()])], config)
+    expected_resp = LLMAssistantMessage(
         content="olleh",
-        metadata=LLMMessageMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
+        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
     )
     assert resp == expected_resp
 
@@ -176,7 +171,7 @@ def test_large_system_prompt() -> None:
         )
         config = LLMInferenceConfig(system_prompt=system_prompt)
         request = llm.create_request(
-            [LLMMessage(content=[text_content, CachePointContent()])], config
+            [LLMUserMessage(content=[text_content, CachePointContent()])], config
         )
         response = llm.invoke_model_with_request(request)
 

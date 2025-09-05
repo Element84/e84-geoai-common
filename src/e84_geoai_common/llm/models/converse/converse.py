@@ -14,11 +14,12 @@ from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
     CachePointContent,
     JSONContent,
+    LLMAssistantMessage,
     LLMDataContentType,
     LLMInferenceConfig,
     LLMMessage,
     LLMMessageContentType,
-    LLMMessageMetadata,
+    LLMResponseMetadata,
     LLMTool,
     LLMToolChoice,
     LLMToolResultContent,
@@ -322,7 +323,7 @@ class BedrockConverseLLM(LLM):
         self,
         messages: Sequence[LLMMessage],
         inference_cfg: LLMInferenceConfig,
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         """Prompt the LLM with a message and optional conversation history."""
         if not messages:
             msg = "Must specify at least one message."
@@ -342,7 +343,7 @@ class BedrockConverseLLM(LLM):
 
     def _response_to_llm_message(
         self, response: ConverseResponse, inference_cfg: LLMInferenceConfig
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         def _to_llm_content(
             index: int,
             c: ConverseTextContent | ConverseImageContent | ConverseToolUseContent,
@@ -376,10 +377,9 @@ class BedrockConverseLLM(LLM):
                 content = [TextContent(text=content)]
         else:
             content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
-        return LLMMessage(
-            role=response_msg.role,
+        return LLMAssistantMessage(
             content=content,
-            metadata=LLMMessageMetadata(
+            metadata=LLMResponseMetadata(
                 input_tokens=response.usage.inputTokens,
                 output_tokens=response.usage.outputTokens,
                 stop_reason=response.stopReason,
