@@ -89,7 +89,7 @@ class LLMMessage(BaseModel):
 
     role: Literal["assistant", "user"] = "user"
     content: str | Sequence[LLMMessageContentType]
-    metadata: LLMMessageMetadata | None = Field(default=None, exclude=True)
+    metadata: LLMMessageMetadata | None = None
 
     def to_text_only(self) -> str:
         """Returns the message as text.
