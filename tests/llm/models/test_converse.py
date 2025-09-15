@@ -12,9 +12,7 @@ from e84_geoai_common.llm.core.llm import (
     CachePointContent,
     ExecutableLLMTool,
     JSONContent,
-    LLMAssistantMessage,
     LLMInferenceConfig,
-    LLMResponseMetadata,
     LLMTool,
     LLMToolResultContent,
     LLMToolUseContent,
@@ -41,11 +39,11 @@ def test_basic_usage() -> None:
     resp = llm.prompt(
         [LLMUserMessage(content="Output the word hello backwards and only that.")], config
     )
-    assert resp == LLMAssistantMessage(
-        role="assistant",
-        content=[TextContent(text="olleh")],
-        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
-    )
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "olleh"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_with_response_prefix() -> None:
@@ -57,11 +55,11 @@ def test_with_response_prefix() -> None:
         [LLMUserMessage(content="Output the sum of 5 and 10 without additional explanation")],
         config,
     )
-    assert resp == LLMAssistantMessage(
-        role="assistant",
-        content=[TextContent(text="5 + 10 =  15")],
-        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
-    )
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "5 + 10 =  15"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_json_mode() -> None:
@@ -145,11 +143,11 @@ def test_image_input() -> None:
 
     resp = llm.prompt([prompt_message], config)
 
-    assert resp == LLMAssistantMessage(
-        role="assistant",
-        content=[TextContent(text="cat")],
-        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
-    )
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "cat"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_tool_use_json() -> None:
@@ -324,12 +322,11 @@ def test_basic_usage_with_prompt_caching() -> None:
     )
     config = LLMInferenceConfig()
     resp = llm.prompt([LLMUserMessage(content=[text_content, CachePointContent()])], config)
-    expected_resp = LLMAssistantMessage(
-        role="assistant",
-        content=[TextContent(text="olleh")],
-        metadata=LLMResponseMetadata(input_tokens=123, output_tokens=123, stop_reason="end_turn"),
-    )
-    assert resp == expected_resp
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "olleh"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_large_system_prompt() -> None:

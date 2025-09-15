@@ -45,10 +45,14 @@ def claude_response_with_content(
     return out
 
 
-def nova_response_with_content(text: str) -> dict[str, Any]:
+def nova_response_with_content(
+    content: str | list[dict[str, Any]], overrides: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Creates a mock Nova response with the given text."""
-    return {
-        "output": {"message": {"role": "assistant", "content": [{"text": text}]}},
+    if isinstance(content, str):
+        content = [{"text": content}]
+    out = {
+        "output": {"message": {"role": "assistant", "content": content}},
         "stopReason": "end_turn",
         "usage": {
             "inputTokens": 123,
@@ -58,6 +62,9 @@ def nova_response_with_content(text: str) -> dict[str, Any]:
             "cacheWriteInputTokenCount": 123,
         },
     }
+    if overrides is not None:
+        out.update(overrides)
+    return out
 
 
 def converse_response_with_content(
