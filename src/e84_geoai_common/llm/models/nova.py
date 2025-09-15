@@ -12,10 +12,12 @@ from e84_geoai_common.llm.core.llm import (
     LLM,
     Base64ImageContent,
     CachePointContent,
+    LLMAssistantMessage,
     LLMInferenceConfig,
     LLMMediaType,
     LLMMessage,
     LLMMessageContentType,
+    LLMResponseMetadata,
     LLMToolResultContent,
     LLMToolUseContent,
     TextContent,
@@ -251,7 +253,7 @@ class BedrockNovaLLM(LLM):
         self,
         messages: Sequence[LLMMessage],
         inference_cfg: LLMInferenceConfig,
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         """Prompt the LLM with a message and optional conversation history."""
         if len(messages) == 0:
             msg = "Must specify at least one message."
@@ -280,31 +282,34 @@ class BedrockNovaLLM(LLM):
 
     def _response_to_llm_message(
         self, response: NovaResponse, inference_cfg: LLMInferenceConfig
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         def _to_llm_content(
             index: int,
             c: NovaTextContent | NovaImageContent,
         ) -> TextContent | Base64ImageContent | LLMToolUseContent:
-            if isinstance(c, NovaTextContent):
-                content = c.text
-                if index == 0 and inference_cfg.response_prefix:
-                    content = inference_cfg.response_prefix + content
-                return TextContent(text=content)
-
-            return c.to_b64_image_content()
+            match c:
+                case NovaTextContent():
+                    text = c.text
+                    if index == 0:
+                        if inference_cfg.json_mode:
+                            text = "{" + text.removesuffix("```")
+                        elif inference_cfg.response_prefix:
+                            text = inference_cfg.response_prefix + text
+                    return TextContent(text=text)
+                case NovaImageContent():
+                    return c.to_b64_image_content()
 
         response_msg = response.output.message
-
-        if len(response_msg.content) == 1 and isinstance(response_msg.content[0], NovaTextContent):
-            content = response_msg.content[0].text
-            if inference_cfg.json_mode:
-                content = [TextContent(text="{" + content.removesuffix("```"))]
-            elif inference_cfg.response_prefix:
-                content = [TextContent(text=inference_cfg.response_prefix + content)]
-        else:
-            content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
-
-        return LLMMessage(role="assistant", content=content)
+        content = [_to_llm_content(index, c) for index, c in enumerate(response_msg.content)]
+        return LLMAssistantMessage(
+            role="assistant",
+            content=content,
+            metadata=LLMResponseMetadata(
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                stop_reason=response.stop_reason,
+            ),
+        )
 
 
 #########################

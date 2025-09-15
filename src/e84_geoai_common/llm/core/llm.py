@@ -68,7 +68,17 @@ LLMMessageContentType = (
 )
 
 
-class LLMMessage(BaseModel):
+class LLMResponseMetadata(BaseModel):
+    """Metadata associated with the message."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    input_tokens: int
+    output_tokens: int
+    stop_reason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
+
+
+class LLMMessage(BaseModel, frozen=True):
     """Standard representation of an LLM message.
 
     Specific LLM implementations should implement logic to translate to and
@@ -93,6 +103,23 @@ class LLMMessage(BaseModel):
                 raise TypeError("The llm message is not just text")
             parts.append(item.text)
         return " ".join(parts)
+
+
+class LLMAssistantMessage(LLMMessage, frozen=True):
+    """Message form LLM."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    role: Literal["assistant"] = "assistant"
+    metadata: LLMResponseMetadata | None = None
+
+
+class LLMUserMessage(LLMMessage, frozen=True):
+    """Message to LLM."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    role: Literal["user"] = "user"
 
 
 class LLMTool(BaseModel):
@@ -227,7 +254,7 @@ class LLM(ABC):
         self,
         messages: Sequence[LLMMessage],
         inference_cfg: LLMInferenceConfig,
-    ) -> LLMMessage:
+    ) -> LLMAssistantMessage:
         """Prompt the LLM with a message and optional conversation history.
 
         Returns the LLM message response.

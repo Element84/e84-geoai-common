@@ -13,10 +13,10 @@ from e84_geoai_common.llm.core.llm import (
     ExecutableLLMTool,
     JSONContent,
     LLMInferenceConfig,
-    LLMMessage,
     LLMTool,
     LLMToolResultContent,
     LLMToolUseContent,
+    LLMUserMessage,
     TextContent,
 )
 from e84_geoai_common.llm.models.claude import (
@@ -37,10 +37,13 @@ def test_basic_usage() -> None:
     )
     config = LLMInferenceConfig()
     resp = llm.prompt(
-        [LLMMessage(content="Output the word hello backwards and only that.")], config
+        [LLMUserMessage(content="Output the word hello backwards and only that.")], config
     )
-    expected_resp = LLMMessage(role="assistant", content=[TextContent(text="olleh")])
-    assert resp == expected_resp
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "olleh"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_with_response_prefix() -> None:
@@ -49,9 +52,14 @@ def test_with_response_prefix() -> None:
     )
     config = LLMInferenceConfig(response_prefix="5 + 10 =")
     resp = llm.prompt(
-        [LLMMessage(content="Output the sum of 5 and 10 without additional explanation")], config
+        [LLMUserMessage(content="Output the sum of 5 and 10 without additional explanation")],
+        config,
     )
-    assert resp == LLMMessage(role="assistant", content=[TextContent(text="5 + 10 =  15")])
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "5 + 10 =  15"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_json_mode() -> None:
@@ -67,7 +75,7 @@ def test_json_mode() -> None:
         )
     )
     config = LLMInferenceConfig(json_mode=True)
-    resp = llm.prompt([LLMMessage(content=json_mode_prompt)], config)
+    resp = llm.prompt([LLMUserMessage(content=json_mode_prompt)], config)
 
     assert resp.role == "assistant"
     assert len(resp.content) == 1
@@ -97,7 +105,7 @@ def test_json_mode_no_extra_text() -> None:
         client=make_test_bedrock_runtime_client([claude_response_with_content(stub_response)])
     )
     config = LLMInferenceConfig(json_mode=True)
-    resp = llm.prompt([LLMMessage(content=prompt)], config)
+    resp = llm.prompt([LLMUserMessage(content=prompt)], config)
 
     assert resp.role == "assistant"
     with does_not_raise():
@@ -125,16 +133,17 @@ def test_image_input() -> None:
         text="Report the animal in the picture and only that, in lowercase. I.e. dog"
     )
 
-    prompt_message = LLMMessage(
-        role="user",
-        content=[prompt_text, image_content],
-    )
+    prompt_message = LLMUserMessage(content=[prompt_text, image_content])
 
     config = LLMInferenceConfig()
 
     resp = llm.prompt([prompt_message], config)
 
-    assert resp == LLMMessage(role="assistant", content=[TextContent(text="cat")])
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "cat"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_tool_use_json() -> None:
@@ -196,7 +205,7 @@ def test_tool_use_json() -> None:
     config = LLMInferenceConfig(tools=[tool.tool_spec])
 
     # test tool use
-    messages = [LLMMessage(content=prompt)]
+    messages = [LLMUserMessage(content=prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
     # print out solution if doing a live test, so we can inspect it if the test fails
@@ -212,7 +221,7 @@ def test_tool_use_json() -> None:
 
     # test tool result
     tool_result = tool.execute(None, tool_use_req)
-    messages = [*messages, resp, LLMMessage(content=[tool_result])]
+    messages = [*messages, resp, LLMUserMessage(content=[tool_result])]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
     # print out solution if doing a live test, so we can inspect it if the test fails
@@ -273,7 +282,7 @@ def test_tool_use_image() -> None:
     config = LLMInferenceConfig(tools=[tool.tool_spec])
 
     # test tool use
-    messages = [LLMMessage(content=prompt)]
+    messages = [LLMUserMessage(content=prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
     # print out solution if doing a live test, so we can inspect it if the test fails
@@ -288,7 +297,7 @@ def test_tool_use_image() -> None:
 
     # test tool result
     tool_result = tool.execute(None, tool_use_req)
-    messages = [*messages, resp, LLMMessage(content=[tool_result])]
+    messages = [*messages, resp, LLMUserMessage(content=[tool_result])]
     resp = llm.prompt(messages=messages, inference_cfg=config)
 
     # print out solution if doing a live test, so we can inspect it if the test fails
@@ -306,9 +315,12 @@ def test_basic_usage_with_prompt_caching() -> None:
         )
     )
     config = LLMInferenceConfig()
-    resp = llm.prompt([LLMMessage(content=[text_content, CachePointContent()])], config)
-    expected_resp = LLMMessage(role="assistant", content=[TextContent(text="olleh")])
-    assert resp == expected_resp
+    resp = llm.prompt([LLMUserMessage(content=[text_content, CachePointContent()])], config)
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "olleh"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
 
 
 def test_large_system_prompt() -> None:
@@ -343,7 +355,7 @@ def test_large_system_prompt() -> None:
         )
         config = LLMInferenceConfig(system_prompt=system_prompt)
         request = llm.create_request(
-            [LLMMessage(content=[text_content, CachePointContent()])], config
+            [LLMUserMessage(content=[text_content, CachePointContent()])], config
         )
         response = llm.invoke_model_with_request(request)
 
