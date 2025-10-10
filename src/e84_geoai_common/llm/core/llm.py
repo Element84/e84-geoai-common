@@ -122,7 +122,7 @@ class LLMUserMessage(LLMMessage, frozen=True):
     role: Literal["user"] = "user"
 
 
-class LLMTool(BaseModel):
+class LLMTool(BaseModel, frozen=True):
     """Definition of a tool that an LLM may use."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -144,41 +144,56 @@ LLMToolContext = TypeVar("LLMToolContext")
 ExecutableFunction = Callable[[LLMToolContext, LLMToolUseContent], LLMToolResultContent]
 
 
-class ExecutableLLMTool[LLMToolContext](BaseModel):
+class ExecutableLLMTool[LLMToolContext](ABC):
     """The executable version of a tool."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
 
     tool_spec: LLMTool
 
-    execution_func: ExecutableFunction[LLMToolContext] = Field(
-        exclude=True,
-        description="A function that implements the execution of the tool. "
-        "The function is expected to take in a LLMToolUseContent and return a "
-        "LLMToolResultContent with a matching ID.",
-    )
+    def __init__(self, tool_spec: LLMTool) -> None:
+        """Constructor."""
+        self.tool_spec = tool_spec
 
     def execute(
         self, context: LLMToolContext, tool_use_request: LLMToolUseContent
     ) -> LLMToolResultContent:
         """Call execution_function with tool_use_request and return the result.
 
+        Args:
+            context: The context to pass to the execution function.
+            tool_use_request: The tool invocation request.
+
         Raises:
             NotImplementedError: If execution_func is not set.
             ValueError: If the ID of LLMToolResultContent returned by execution_func
                 does not match the tool_use_request ID.
         """
-        tool_result = self.execution_func(context, tool_use_request)
+        tool_result = self._execute(context, tool_use_request)
+        self._validate_tool_result_id(tool_result, tool_use_request)
+        return tool_result
+
+    def _validate_tool_result_id(
+        self, tool_result: LLMToolResultContent, tool_use_request: LLMToolUseContent
+    ) -> None:
         if tool_result.id != tool_use_request.id:
             msg = (
-                (
-                    f"Tool result ID does not match tool call ID for tool {self.tool_spec.name} for"
-                    " input: "
-                ),
-                f"{tool_use_request.input}.",
+                f"Tool result ID '{tool_result.id}' does not match "
+                f"tool call ID '{tool_use_request.id}'."
+                f"Tool call:\n{tool_use_request}\n"
+                f"Tool result:\n{tool_result}\n"
             )
             raise ValueError(msg)
-        return tool_result
+
+    @abstractmethod
+    def _execute(
+        self,
+        context: LLMToolContext,
+        tool_use_request: LLMToolUseContent,
+    ) -> LLMToolResultContent:
+        """The function that executes the tool.
+
+        This function should be overridden by subclasses to provide the actual
+        implementation of the tool.
+        """
 
 
 class LLMToolChoice(BaseModel):
