@@ -161,23 +161,25 @@ def test_tool_use_json() -> None:
         temperature: float = Field(description="Temperature in Celsius")
         humidity: float = Field(description="Humidity %.")
 
-    def exec_weather_tool(
-        context: None, tool_use_request: LLMToolUseContent
-    ) -> LLMToolResultContent:
-        weather_info = WeatherInfo(weather_description="Sunny", temperature=20, humidity=50)
-        tool_result = LLMToolResultContent(
-            id=tool_use_request.id, content=[JSONContent(data=weather_info.model_dump())]
-        )
-        return tool_result
+    class _WeatherTool(ExecutableLLMTool[None]):
+        def _execute(
+            self,
+            context: None,  # noqa: ARG002
+            tool_use_request: LLMToolUseContent,
+        ) -> LLMToolResultContent:
+            weather_info = WeatherInfo(weather_description="Sunny", temperature=20, humidity=50)
+            tool_result = LLMToolResultContent(
+                id=tool_use_request.id, content=[JSONContent(data=weather_info.model_dump())]
+            )
+            return tool_result
 
-    tool = ExecutableLLMTool(
+    tool = _WeatherTool(
         tool_spec=LLMTool(
             name="GetWeatherInfo",
             description="Get current weather info for a place.",
             input_model=GetWeatherInfoInput,
             output_model=WeatherInfo,
-        ),
-        execution_func=exec_weather_tool,
+        )
     )
 
     dummy_responses = [
@@ -238,23 +240,25 @@ def test_tool_use_image() -> None:
     class ImageGeneratorInput(BaseModel):
         description: str = Field(description="Description of the image to generate.")
 
-    def exec_image_gen_tool(
-        context: None, tool_use_request: LLMToolUseContent
-    ) -> LLMToolResultContent:
-        image_path = str(Path(__file__).parent / "images/cat.webp")
-        base64_string = encode_image_to_base64_str(image_path)
-        image_content = Base64ImageContent(media_type="image/webp", data=base64_string)
-        tool_result = LLMToolResultContent(id=tool_use_request.id, content=[image_content])
-        return tool_result
+    class _ImageGeneratorTool(ExecutableLLMTool[None]):
+        def _execute(
+            self,
+            context: None,  # noqa: ARG002
+            tool_use_request: LLMToolUseContent,
+        ) -> LLMToolResultContent:
+            image_path = str(Path(__file__).parent / "images/cat.webp")
+            base64_string = encode_image_to_base64_str(image_path)
+            image_content = Base64ImageContent(media_type="image/webp", data=base64_string)
+            tool_result = LLMToolResultContent(id=tool_use_request.id, content=[image_content])
+            return tool_result
 
-    tool = ExecutableLLMTool(
+    tool = _ImageGeneratorTool(
         tool_spec=LLMTool(
             name="GenerateImage",
             description="Generate an image from text. Returns the generated image only.",
             input_model=ImageGeneratorInput,
             output_model=None,
         ),
-        execution_func=exec_image_gen_tool,
     )
 
     dummy_responses = [
