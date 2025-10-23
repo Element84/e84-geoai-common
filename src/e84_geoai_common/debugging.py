@@ -2,7 +2,7 @@ import folium  # type: ignore[reportMissingImports]
 from shapely import GeometryCollection
 from shapely.geometry.base import BaseGeometry
 
-from e84_geoai_common.util import timed_function
+from e84_geoai_common.tracing import timed_function
 
 SEARCH_AREA_STYLE = {
     "fillColor": "transparent",

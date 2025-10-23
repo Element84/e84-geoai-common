@@ -67,7 +67,7 @@ from e84_geoai_common.llm.models.converse.tool_use_types import (
     ConverseToolUseContent,
 )
 from e84_geoai_common.llm.models.nova import NOVA_LITE, NOVA_MICRO, NOVA_PRO
-from e84_geoai_common.util import observe, timed_function
+from e84_geoai_common.tracing import observe, timed_function
 
 # Converse uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815

@@ -22,7 +22,7 @@ from e84_geoai_common.llm.core.llm import (
     LLMToolUseContent,
     TextContent,
 )
-from e84_geoai_common.util import observe, timed_function
+from e84_geoai_common.tracing import observe, timed_function
 
 log = logging.getLogger(__name__)
 
