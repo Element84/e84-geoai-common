@@ -194,3 +194,38 @@ def ensure_bucket_exists(
                 f" and create_buckets_if_missing flag is False."
             )
             raise ValueError(msg) from e
+
+
+@overload
+def observe[F: Callable[..., Any]](func: F) -> F: ...
+
+
+@overload
+def observe[F: Callable[..., Any]](
+    func: None = None,
+    **kwargs: Any,  # noqa: ANN401
+) -> Callable[[F], F]: ...
+
+
+def observe[F: Callable[..., Any]](
+    func: F | None = None,
+    **kwargs: Any,
+) -> F | Callable[[F], F]:
+    """A decorator that adds Langfuse observability if available.
+
+    Attempts to import and use Langfuse's observe decorator. If Langfuse is not
+    available, the function is returned unchanged.
+    """
+    try:
+        from langfuse import observe  # pyright: ignore[reportUnknownVariableType]  # noqa: PLC0415
+
+        def decorator(func: F) -> F:
+            return observe(func, **kwargs)
+
+        if func is None:
+            return decorator
+        return decorator(func)
+    except ImportError:
+        if func is None:
+            raise ValueError("Expected a value for func.") from None
+        return func
