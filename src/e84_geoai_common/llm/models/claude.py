@@ -42,6 +42,10 @@ CLAUDE_3_5_HAIKU = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 CLAUDE_3_5_SONNET_V2 = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
 CLAUDE_3_7_SONNET = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 CLAUDE_4_SONNET = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+CLAUDE_4_OPUS = "us.anthropic.claude-opus-4-20250514-v1:0"
+CLAUDE_4_1_OPUS = "us.anthropic.claude-opus-4-1-20250805-v1:0"
+CLAUDE_4_5_HAIKU = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+CLAUDE_4_5_SONNET = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
@@ -56,6 +60,10 @@ CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude 3.5 Sonnet v2": CLAUDE_3_5_SONNET_V2,
     "Claude 3.7 Sonnet": CLAUDE_3_7_SONNET,
     "Claude 4 Sonnet": CLAUDE_4_SONNET,
+    "Claude 4 Opus": CLAUDE_4_OPUS,
+    "Claude 4.1 Opus": CLAUDE_4_1_OPUS,
+    "Claude 4.5 Haiku": CLAUDE_4_5_HAIKU,
+    "Claude 4.5 Sonnet": CLAUDE_4_5_SONNET,
 }
 
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
