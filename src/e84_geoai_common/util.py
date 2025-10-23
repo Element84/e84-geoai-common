@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, cast
 from botocore.exceptions import ClientError
 from mypy_boto3_s3 import S3Client
 
+from e84_geoai_common import tracing
+
 if TYPE_CHECKING:
     from mypy_boto3_s3.literals import BucketLocationConstraintType
 
@@ -133,3 +135,8 @@ def ensure_bucket_exists(
                 f" and create_buckets_if_missing flag is False."
             )
             raise ValueError(msg) from e
+
+
+# DEPRECATED: Switch directly to tracing to use this.
+# Here to avoid breaking other users.
+timed_function = tracing.timed_function
