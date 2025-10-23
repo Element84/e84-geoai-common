@@ -226,6 +226,10 @@ def observe[F: Callable[..., Any]](
             return decorator
         return decorator(func)
     except ImportError:
+
+        def decorator(func: F) -> F:
+            return func
+
         if func is None:
-            raise ValueError("Expected a value for func.") from None
+            return decorator
         return func
