@@ -1,10 +1,11 @@
 import json
 import logging
 from collections.abc import Sequence
-from functools import reduce
+from itertools import pairwise
 from typing import Any, Literal, cast
 
 import boto3
+import botocore.config
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,7 +19,6 @@ from e84_geoai_common.llm.core.llm import (
     LLMDataContentType,
     LLMInferenceConfig,
     LLMMessage,
-    LLMMessageContentType,
     LLMResponseMetadata,
     LLMTool,
     LLMToolChoice,
@@ -42,6 +42,10 @@ CLAUDE_3_5_HAIKU = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 CLAUDE_3_5_SONNET_V2 = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
 CLAUDE_3_7_SONNET = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 CLAUDE_4_SONNET = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+CLAUDE_4_OPUS = "us.anthropic.claude-opus-4-20250514-v1:0"
+CLAUDE_4_1_OPUS = "us.anthropic.claude-opus-4-1-20250805-v1:0"
+CLAUDE_4_5_HAIKU = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+CLAUDE_4_5_SONNET = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
@@ -56,6 +60,7 @@ CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude 3.5 Sonnet v2": CLAUDE_3_5_SONNET_V2,
     "Claude 3.7 Sonnet": CLAUDE_3_7_SONNET,
     "Claude 4 Sonnet": CLAUDE_4_SONNET,
+    # We won't add any new models to this as we want to remove it eventually.
 }
 
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
@@ -224,45 +229,40 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
     """Converts the generic LLM Message into a ClaudeMessage."""
 
     def _handle_content(
-        acc: tuple[ClaudeMessageContentType, ...], content: LLMMessageContentType
-    ) -> tuple[ClaudeMessageContentType, ...]:
+        content: TextContent | Base64ImageContent | LLMToolUseContent | LLMToolResultContent,
+        *,
+        cache: bool = False,
+    ) -> ClaudeMessageContentType:
+        cache_control = ClaudeCacheControl() if cache else None
         match content:
             case TextContent():
-                return (
-                    *acc,
-                    ClaudeTextContent(text=content.text),
-                )
+                return ClaudeTextContent(text=content.text, cache_control=cache_control)
             case Base64ImageContent():
-                return (
-                    *acc,
-                    ClaudeImageContent(
-                        source=ClaudeImageSource(media_type=content.media_type, data=content.data)
-                    ),
+                return ClaudeImageContent(
+                    source=ClaudeImageSource(
+                        media_type=content.media_type,
+                        data=content.data,
+                        cache_control=cache_control,
+                    )
                 )
             case LLMToolUseContent():
-                return (
-                    *acc,
-                    ClaudeToolUseContent(id=content.id, name=content.name, input=content.input),
+                return ClaudeToolUseContent(
+                    id=content.id,
+                    name=content.name,
+                    input=content.input,
+                    cache_control=cache_control,
                 )
             case LLMToolResultContent():
-                return (*acc, _llm_tool_result_to_claude_tool_result(content))
-            case CachePointContent():
-                # If cache point is first element, drop it.
-                if len(acc) == 0:
-                    return acc
-
-                # Modify should cache of last element in Sequence
-                acc_until_last: tuple[ClaudeMessageContentType, ...] = acc[:-1]
-
-                last_content = acc[-1]
-                last_content.cache_control = ClaudeCacheControl()
-
-                return (*acc_until_last, last_content)
+                return _llm_tool_result_to_claude_tool_result(content, cache_control=cache_control)
 
     if isinstance(msg.content, str):
         content = [ClaudeTextContent(type="text", text=msg.content, cache_control=None)]
     else:
-        content = reduce(_handle_content, msg.content, ())
+        content = [
+            _handle_content(content, cache=isinstance(next_content, CachePointContent))
+            for content, next_content in pairwise([*msg.content, None])
+            if content and not isinstance(content, CachePointContent)
+        ]
     return ClaudeMessage(role=msg.role, content=content)
 
 
@@ -305,7 +305,7 @@ def _llm_tool_choice_to_claude_tool_choice(
 
 
 def _llm_tool_result_to_claude_tool_result(
-    tool_result: LLMToolResultContent,
+    tool_result: LLMToolResultContent, cache_control: ClaudeCacheControl | None = None
 ) -> ClaudeToolResultContent:
     def _to_tool_result_content(
         in_content: LLMDataContentType,
@@ -327,6 +327,7 @@ def _llm_tool_result_to_claude_tool_result(
         tool_use_id=tool_result.id,
         is_error=(tool_result.status == "error"),
         content=out_content,
+        cache_control=cache_control,
     )
     return out
 
@@ -348,7 +349,10 @@ class BedrockClaudeLLM(LLM):
             client: Optional pre-initialized boto3 client. Defaults to None.
         """
         self.model_id = model_id
-        self.client = client or boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]
+        self.client = client or boto3.client(  # type: ignore[reportUnknownMemberType]
+            "bedrock-runtime",
+            config=botocore.config.Config(read_timeout=300),
+        )
 
     def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig

@@ -4,6 +4,7 @@ from functools import reduce
 from typing import Literal, Self, cast
 
 import boto3
+import botocore.config
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 from pydantic import BaseModel, ConfigDict, Field
@@ -222,7 +223,10 @@ class BedrockNovaLLM(LLM):
             client: Optional pre-initialized boto3 client. Defaults to None.
         """
         self.model_id = model_id
-        self.client = client or boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]
+        self.client = client or boto3.client(  # type: ignore[reportUnknownMemberType]
+            "bedrock-runtime",
+            config=botocore.config.Config(read_timeout=300),
+        )
 
     def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
