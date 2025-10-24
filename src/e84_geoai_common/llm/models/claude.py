@@ -255,9 +255,11 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
                 acc_until_last: tuple[ClaudeMessageContentType, ...] = acc[:-1]
 
                 last_content = acc[-1]
-                last_content.cache_control = ClaudeCacheControl()
+                last_content_with_cache_control = last_content.model_copy(
+                    update={"cache_control": ClaudeCacheControl()}
+                )
 
-                return (*acc_until_last, last_content)
+                return (*acc_until_last, last_content_with_cache_control)
 
     if isinstance(msg.content, str):
         content = [ClaudeTextContent(type="text", text=msg.content, cache_control=None)]
