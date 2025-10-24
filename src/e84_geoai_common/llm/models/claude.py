@@ -60,10 +60,7 @@ CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude 3.5 Sonnet v2": CLAUDE_3_5_SONNET_V2,
     "Claude 3.7 Sonnet": CLAUDE_3_7_SONNET,
     "Claude 4 Sonnet": CLAUDE_4_SONNET,
-    "Claude 4 Opus": CLAUDE_4_OPUS,
-    "Claude 4.1 Opus": CLAUDE_4_1_OPUS,
-    "Claude 4.5 Haiku": CLAUDE_4_5_HAIKU,
-    "Claude 4.5 Sonnet": CLAUDE_4_5_SONNET,
+    # We won't add any new models to this as we want to remove it eventually.
 }
 
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
