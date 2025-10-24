@@ -26,7 +26,7 @@ from e84_geoai_common.llm.core.llm import (
     LLMToolUseContent,
     TextContent,
 )
-from e84_geoai_common.util import timed_function
+from e84_geoai_common.tracing import observe, timed_function, update_current_generation
 
 log = logging.getLogger(__name__)
 
@@ -385,6 +385,7 @@ class BedrockClaudeLLM(LLM):
         )
 
     @timed_function
+    @observe(as_type="generation", name="BedrockClaudeLLM.prompt")
     def prompt(
         self,
         messages: Sequence[LLMMessage],
@@ -411,6 +412,14 @@ class BedrockClaudeLLM(LLM):
         response_body = response["body"].read().decode("UTF-8")
         claude_response = ClaudeResponse.model_validate_json(response_body)
         log.info("Token usage: %s", claude_response.usage)
+        update_current_generation(
+            usage_details={
+                "input": claude_response.usage.input_tokens,
+                "output": claude_response.usage.output_tokens,
+                "cache_read_input_tokens": claude_response.usage.cache_read_input_tokens,
+                "cache_creation_input_tokens": claude_response.usage.cache_creation_input_tokens,
+            }
+        )
         return claude_response
 
     def _response_to_llm_message(

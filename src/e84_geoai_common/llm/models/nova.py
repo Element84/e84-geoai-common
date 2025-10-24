@@ -23,7 +23,7 @@ from e84_geoai_common.llm.core.llm import (
     LLMToolUseContent,
     TextContent,
 )
-from e84_geoai_common.util import timed_function
+from e84_geoai_common.tracing import observe, timed_function
 
 log = logging.getLogger(__name__)
 
@@ -253,6 +253,7 @@ class BedrockNovaLLM(LLM):
         )
 
     @timed_function
+    @observe(as_type="generation", name="BedrockNovaLLM.prompt")
     def prompt(
         self,
         messages: Sequence[LLMMessage],

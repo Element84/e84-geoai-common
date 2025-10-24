@@ -21,7 +21,7 @@ from shapely import (
 )
 from shapely.geometry.base import BaseGeometry, BaseMultipartGeometry
 
-from e84_geoai_common.util import timed_function
+from e84_geoai_common.tracing import timed_function
 
 
 def geometry_from_wkt(wkt: str) -> BaseGeometry:

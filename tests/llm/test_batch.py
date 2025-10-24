@@ -30,6 +30,7 @@ from e84_geoai_common.llm.tests.mock_bedrock import (
     batch_nova_output_example,
     make_test_bedrock_client,
 )
+from e84_geoai_common.llm.tests.mock_bedrock_runtime import make_test_bedrock_runtime_client
 
 
 @pytest.fixture
@@ -48,7 +49,8 @@ def test_claude_create_and_run_job(
     timestamp_ns = time.time_ns()
     job_name = f"pytest-job-{timestamp_ns}"
 
-    llm = BedrockClaudeLLM(model_id=CLAUDE_3_5_HAIKU)
+    bedrock_runtime_client = make_test_bedrock_runtime_client([])
+    llm = BedrockClaudeLLM(model_id=CLAUDE_3_5_HAIKU, client=bedrock_runtime_client)
     llm_question = "What is 10+10?"
     llm_response = "10 + 10 = 20"
 
@@ -98,7 +100,8 @@ def test_nova_create_and_run_job(
     timestamp_ns = time.time_ns()
     job_name = f"pytest-job-{timestamp_ns}"
 
-    llm = BedrockNovaLLM()
+    bedrock_runtime_client = make_test_bedrock_runtime_client([])
+    llm = BedrockNovaLLM(client=bedrock_runtime_client)
     llm_question = "What is 10+10?"
     llm_response = "10 + 10 = 20"
 

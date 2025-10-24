@@ -149,6 +149,6 @@ def make_test_bedrock_runtime_client(
     """
     if USE_REAL_BEDROCK_RUNTIME_CLIENT or use_real_client:
         return boto3.client("bedrock-runtime")  # type: ignore[reportUnknownMemberType]
-    if responses:
+    if responses is not None:
         return _MockBedrockRuntimeClient(responses)
     raise RuntimeError("If not using a real client the responses must be provided")
