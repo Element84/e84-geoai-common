@@ -29,7 +29,7 @@ class ExtractDataExample[Model: BaseModel](BaseModel):
                 str: Formatted string with example name, user query, and data
                 structure in JSON format.
         """
-        json_str = self.structure.model_dump_json(indent=2, exclude_none=True)
+        json_str = self.structure.model_dump_json(exclude_none=True)
         query_json = f"```json\n{json_str}\n```"
         return f'Example: {self.name}\nUser Query: "{self.user_query}"\n\n{query_json}'
 

@@ -335,7 +335,7 @@ def _llm_tool_result_to_claude_tool_result(
             case TextContent():
                 out_content = ClaudeTextContent(text=in_content.text)
             case JSONContent():
-                text = json.dumps(in_content.data, indent=2)
+                text = json.dumps(in_content.data)
                 out_content = ClaudeTextContent(text=text)
             case Base64ImageContent():
                 out_content = ClaudeImageContent(
