@@ -56,7 +56,7 @@ class LLMToolResultContent(BaseModel):
 
 
 class CachePointContent(BaseModel):
-    """Cache point content model."""
+    """A marker within a list of content that indicates everything before this can be cached."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 

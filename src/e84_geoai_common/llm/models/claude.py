@@ -48,6 +48,21 @@ CLAUDE_4_5_HAIKU = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 CLAUDE_4_5_SONNET = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 
+_MODELS_NOT_SUPPORTING_CACHING = {
+    CLAUDE_3_HAIKU,
+    CLAUDE_3_5_SONNET,
+    CLAUDE_3_SONNET,
+    CLAUDE_3_OPUS,
+    CLAUDE_INSTANT,
+    CLAUDE_3_5_SONNET_V2,
+}
+
+
+def _supports_caching(model: str) -> bool:
+    """Returns true if the model supports caching."""
+    return model not in _MODELS_NOT_SUPPORTING_CACHING
+
+
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 # DEPRECATED: Use the constants above instead.
 CLAUDE_BEDROCK_MODEL_IDS = {
@@ -134,7 +149,7 @@ ClaudeMessageContentType = (
 class ClaudeMessage(BaseModel):
     """Claude message base model."""
 
-    model_config = ConfigDict(strict=True, extra="forbid")
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
     role: Literal["assistant", "user"]
     content: str | Sequence[ClaudeMessageContentType]
@@ -143,6 +158,8 @@ class ClaudeMessage(BaseModel):
 class ClaudeToolChoice(BaseModel):
     """Claude tool choice model."""
 
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+
     type: Literal["auto", "any", "tool"]
     name: str | None = None
     # disable_parallel_tool_use is documented in Anthropic docs but seems to
@@ -150,8 +167,10 @@ class ClaudeToolChoice(BaseModel):
     # disable_parallel_tool_use: bool | None = None # noqa: ERA001
 
 
-class ClaudeTool(BaseModel):
+class ClaudeTool(ClaudeCacheableContent):
     """Representation of a tool that Claude can use."""
+
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
     name: str
     description: str | None = None
@@ -161,7 +180,7 @@ class ClaudeTool(BaseModel):
 class ClaudeInvokeLLMRequest(BaseModel):
     """Represents a request to invoke Claude and get a response back."""
 
-    model_config = ConfigDict(strict=True, extra="forbid")
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
     anthropic_version: str = ANTHROPIC_API_VERSION
 
@@ -173,7 +192,9 @@ class ClaudeInvokeLLMRequest(BaseModel):
 
     stop_sequences: list[str] | None = None
 
-    system: str | None = Field(default=None, description="System Prompt")
+    system: Sequence[ClaudeMessageContentType] | None = Field(
+        default=None, description="System Prompt"
+    )
 
     temperature: float = Field(
         default=0,
@@ -279,7 +300,7 @@ def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
 
     description = tool.description
     if tool.output_model is not None:
-        output_schema = json.dumps(tool.output_model.model_json_schema(), indent=2)
+        output_schema = json.dumps(tool.output_model.model_json_schema())
         description = f"{tool.description}\n\nOutput schema:\n```json\n{output_schema}\n```"
 
     claude_tool = ClaudeTool(
@@ -372,9 +393,21 @@ class BedrockClaudeLLM(LLM):
             tools = [_llm_tool_to_claude_tool(t) for t in config.tools]
             tool_choice = _llm_tool_choice_to_claude_tool_choice(config.tool_choice)
 
+            if _supports_caching(self.model_id):
+                last_tool = tools[-1]
+                last_tool.cache_control = ClaudeCacheControl()
+
+        system_content: list[ClaudeMessageContentType] | None = None
+
+        if config.system_prompt:
+            cache_control = ClaudeCacheControl() if _supports_caching(self.model_id) else None
+            system_content = [
+                ClaudeTextContent(cache_control=cache_control, text=config.system_prompt)
+            ]
+
         return ClaudeInvokeLLMRequest(
             max_tokens=config.max_tokens,
-            system=config.system_prompt,
+            system=system_content,
             temperature=config.temperature,
             top_k=config.top_k,
             top_p=config.top_p,
