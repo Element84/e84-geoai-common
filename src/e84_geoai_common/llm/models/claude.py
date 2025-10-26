@@ -81,7 +81,7 @@ CLAUDE_BEDROCK_MODEL_IDS = {
 ConverseMediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
 
 
-class ClaudeCacheControl(BaseModel):
+class ClaudeCacheControl(BaseModel, frozen=True):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     type: Literal["ephemeral"] = "ephemeral"
@@ -122,7 +122,7 @@ class ClaudeImageContent(ClaudeCacheableContent):
 class ClaudeToolUseContent(ClaudeCacheableContent):
     """Represents a tool use request from Claude."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     type: Literal["tool_use"] = "tool_use"
     id: str
@@ -133,7 +133,7 @@ class ClaudeToolUseContent(ClaudeCacheableContent):
 class ClaudeToolResultContent(ClaudeCacheableContent):
     """Claude tool result model."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     type: Literal["tool_result"] = "tool_result"
     tool_use_id: str
@@ -146,7 +146,7 @@ ClaudeMessageContentType = (
 )
 
 
-class ClaudeMessage(BaseModel):
+class ClaudeMessage(BaseModel, frozen=True):
     """Claude message base model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -155,7 +155,7 @@ class ClaudeMessage(BaseModel):
     content: str | Sequence[ClaudeMessageContentType]
 
 
-class ClaudeToolChoice(BaseModel):
+class ClaudeToolChoice(BaseModel, frozen=True):
     """Claude tool choice model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -170,14 +170,14 @@ class ClaudeToolChoice(BaseModel):
 class ClaudeTool(ClaudeCacheableContent):
     """Representation of a tool that Claude can use."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     name: str
     description: str | None = None
     input_schema: dict[str, Any]
 
 
-class ClaudeInvokeLLMRequest(BaseModel):
+class ClaudeInvokeLLMRequest(BaseModel, frozen=True):
     """Represents a request to invoke Claude and get a response back."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -220,7 +220,7 @@ class ClaudeInvokeLLMRequest(BaseModel):
 # Other response objects
 
 
-class ClaudeUsageInfo(BaseModel):
+class ClaudeUsageInfo(BaseModel, frozen=True):
     """Claude usage-info model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
@@ -231,7 +231,7 @@ class ClaudeUsageInfo(BaseModel):
     cache_read_input_tokens: int | None = None
 
 
-class ClaudeResponse(BaseModel):
+class ClaudeResponse(BaseModel, frozen=True):
     """Claude response model."""
 
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
