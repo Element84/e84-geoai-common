@@ -223,6 +223,10 @@ class LLMInferenceConfig(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     system_prompt: str | None = Field(default=None, description="System Prompt")
+    cache_system_prompt: bool = Field(
+        default=True,
+        description="Indicates if the system prompt should be marked as cacheable in the LLM.",
+    )
     max_tokens: int = Field(default=1000, description="Maximum number of output tokens")
     temperature: float = Field(
         default=0,
@@ -245,6 +249,10 @@ class LLMInferenceConfig(BaseModel):
     )
     tools: list[LLMTool] | None = Field(
         default=None, description="List of tools that the model may call."
+    )
+    cache_tools: bool = Field(
+        default=True,
+        description="Indicates if the tools should be marked as cacheable in the LLM.",
     )
     tool_choice: LLMToolChoice | None = Field(
         default=None,

@@ -393,7 +393,7 @@ class BedrockClaudeLLM(LLM):
             tools = [_llm_tool_to_claude_tool(t) for t in config.tools]
             tool_choice = _llm_tool_choice_to_claude_tool_choice(config.tool_choice)
 
-            if _supports_caching(self.model_id):
+            if _supports_caching(self.model_id) and config.cache_tools:
                 # If the model supports caching we'll cache all of the tool definitions by default.
                 # Everyt tool before the last tool will be included in this cache.
                 last_tool = tools[-1]
@@ -402,7 +402,11 @@ class BedrockClaudeLLM(LLM):
         system_content: list[ClaudeMessageContentType] | None = None
 
         if config.system_prompt:
-            cache_control = ClaudeCacheControl() if _supports_caching(self.model_id) else None
+            cache_control = (
+                ClaudeCacheControl()
+                if _supports_caching(self.model_id) and config.cache_system_prompt
+                else None
+            )
             system_content = [
                 ClaudeTextContent(cache_control=cache_control, text=config.system_prompt)
             ]
