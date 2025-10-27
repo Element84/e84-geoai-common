@@ -122,7 +122,7 @@ class ClaudeImageContent(ClaudeCacheableContent):
 class ClaudeToolUseContent(ClaudeCacheableContent):
     """Represents a tool use request from Claude."""
 
-    model_config = ConfigDict(strict=True, extra="forbid")
+    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
     type: Literal["tool_use"] = "tool_use"
     id: str
@@ -146,19 +146,19 @@ ClaudeMessageContentType = (
 )
 
 
-class ClaudeMessage(BaseModel, frozen=True):
+class ClaudeMessage(BaseModel):
     """Claude message base model."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     role: Literal["assistant", "user"]
     content: str | Sequence[ClaudeMessageContentType]
 
 
-class ClaudeToolChoice(BaseModel, frozen=True):
+class ClaudeToolChoice(BaseModel):
     """Claude tool choice model."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     type: Literal["auto", "any", "tool"]
     name: str | None = None
@@ -394,6 +394,8 @@ class BedrockClaudeLLM(LLM):
             tool_choice = _llm_tool_choice_to_claude_tool_choice(config.tool_choice)
 
             if _supports_caching(self.model_id):
+                # If the model supports caching we'll cache all of the tool definitions by default.
+                # Everyt tool before the last tool will be included in this cache.
                 last_tool = tools[-1]
                 last_tool.cache_control = ClaudeCacheControl()
 
