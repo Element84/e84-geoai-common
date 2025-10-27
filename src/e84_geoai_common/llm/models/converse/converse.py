@@ -198,7 +198,7 @@ def _llm_tool_to_converse_tool(tool: LLMTool) -> ConverseSingleTool:
 
     description = tool.description
     if tool.output_model is not None:
-        output_schema = json.dumps(tool.output_model.model_json_schema(), indent=2)
+        output_schema = json.dumps(tool.output_model.model_json_schema())
         description = f"{tool.description}\n\nOutput schema:\n```json\n{output_schema}\n```"
 
     converse_tool = ConverseSingleTool(
