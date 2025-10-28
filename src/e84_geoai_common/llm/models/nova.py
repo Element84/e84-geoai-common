@@ -275,6 +275,7 @@ class BedrockNovaLLM(LLM):
         try:
             response = self.client.invoke_model(
                 modelId=self.model_id,
+                contentType="application/json",
                 body=json_request,
             )
         except botocore.exceptions.ClientError:

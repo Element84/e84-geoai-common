@@ -443,7 +443,10 @@ class BedrockClaudeLLM(LLM):
         """Invoke model with request and get a response back."""
         try:
             response = self.client.invoke_model(
-                modelId=self.model_id, body=request.model_dump_json(exclude_none=True)
+                modelId=self.model_id,
+                # Regular Bedrock works without this value but LiteLLM requires it to work as proxy.
+                contentType="application/json",
+                body=request.model_dump_json(exclude_none=True),
             )
         except botocore.exceptions.ClientError:
             log.exception("Request body: %s", request.model_dump_json())
