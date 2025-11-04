@@ -84,6 +84,24 @@ LLAMA_3_2_3_B_INSTRUCT = "us.meta.llama3-2-3b-instruct-v1:0"
 LLAMA_3_2_90_B_VISION_INSTRUCT = "us.meta.llama3-2-90b-instruct-v1:0"
 LLAMA_3_3_70_B_INSTRUCT = "us.meta.llama3-3-70b-instruct-v1:0"
 
+# Amazon Titan Models
+TITAN_TEXT_EXPRESS = "amazon.titan-text-express-v1"
+TITAN_TEXT_LITE = "amazon.titan-text-lite-v1"
+TITAN_TEXT_PREMIER = "amazon.titan-text-premier-v1:0"
+
+# Mistral AI Models
+MISTRAL_7B_INSTRUCT = "mistral.mistral-7b-instruct-v0:2"
+MISTRAL_8X7B_INSTRUCT = "mistral.mixtral-8x7b-instruct-v0:1"
+MISTRAL_LARGE = "mistral.mistral-large-2402-v1:0"
+MISTRAL_LARGE_2407 = "mistral.mistral-large-2407-v1:0"
+MISTRAL_SMALL = "mistral.mistral-small-2402-v1:0"
+
+# Cohere Models
+COHERE_COMMAND_TEXT = "cohere.command-text-v14"
+COHERE_COMMAND_LIGHT_TEXT = "cohere.command-light-text-v14"
+COHERE_COMMAND_R = "cohere.command-r-v1:0"
+COHERE_COMMAND_R_PLUS = "cohere.command-r-plus-v1:0"
+
 # DEPRECATED: Use the constants above instead.
 CONVERSE_BEDROCK_MODEL_IDS = {
     "Claude 3 Haiku": CLAUDE_3_HAIKU,
@@ -104,6 +122,18 @@ CONVERSE_BEDROCK_MODEL_IDS = {
     "Llama 3.2 3B Instruct": LLAMA_3_2_3_B_INSTRUCT,
     "Llama 3.2 90B Vision Instruct": LLAMA_3_2_90_B_VISION_INSTRUCT,
     "Llama 3.3 70B Instruct": LLAMA_3_3_70_B_INSTRUCT,
+    "Titan Text Express": TITAN_TEXT_EXPRESS,
+    "Titan Text Lite": TITAN_TEXT_LITE,
+    "Titan Text Premier": TITAN_TEXT_PREMIER,
+    "Mistral 7B Instruct": MISTRAL_7B_INSTRUCT,
+    "Mistral 8x7B Instruct": MISTRAL_8X7B_INSTRUCT,
+    "Mistral Large": MISTRAL_LARGE,
+    "Mistral Large 2407": MISTRAL_LARGE_2407,
+    "Mistral Small": MISTRAL_SMALL,
+    "Cohere Command Text": COHERE_COMMAND_TEXT,
+    "Cohere Command Light Text": COHERE_COMMAND_LIGHT_TEXT,
+    "Cohere Command R": COHERE_COMMAND_R,
+    "Cohere Command R+": COHERE_COMMAND_R_PLUS,
 }
 
 
