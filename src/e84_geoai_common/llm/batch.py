@@ -17,11 +17,11 @@ from e84_geoai_common.util import ensure_bucket_exists
 ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
 
 
-class BatchInputItem(BaseModel):
+class PreBatchRecordInput(BaseModel):
     """Preliminary input record for batch before applying model."""
 
-    record_id: str | None = None
-    model_input: list[LLMMessage]
+    recordId: str | None = None
+    modelInput: list[LLMMessage]
 
 
 class BatchRecordInput[RequestModel: BaseModel](BaseModel):
@@ -196,7 +196,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         role_arn: str,
         input_s3_file_url: str,
         output_s3_directory_url: str,
-        conversations: list[list[LLMMessage]] | list[BatchInputItem] | None = None,
+        conversations: list[list[LLMMessage]] | list[PreBatchRecordInput] | None = None,
         inference_cfg: LLMInferenceConfig | None = None,
         *,
         create_buckets_if_missing: bool = False,
@@ -277,17 +277,17 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
     def _parse_conversations(
         self,
-        conversations: list[list[LLMMessage]] | list[BatchInputItem],
+        conversations: list[list[LLMMessage]] | list[PreBatchRecordInput],
         inference_config: LLMInferenceConfig,
     ) -> list[BatchRecordInput[RequestModel]]:
         input_requests: list[BatchRecordInput[RequestModel]] = []
         for i, conversation in enumerate(conversations):
             record_id = f"RECORD{i:010d}"
 
-            if isinstance(conversation, BatchInputItem):
-                messages = conversation.model_input
-                if conversation.record_id:
-                    record_id = conversation.record_id
+            if isinstance(conversation, PreBatchRecordInput):
+                messages = conversation.modelInput
+                if conversation.recordId:
+                    record_id = conversation.recordId
             else:
                 messages = conversation
 

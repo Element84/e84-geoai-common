@@ -4,7 +4,7 @@ import pytest
 from moto import mock_aws
 from mypy_boto3_s3 import S3Client
 
-from e84_geoai_common.llm.batch import BatchInputItem, BedrockBatchInference
+from e84_geoai_common.llm.batch import BedrockBatchInference, PreBatchRecordInput
 from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage, TextContent
 from e84_geoai_common.llm.models.claude import (
     CLAUDE_3_5_HAIKU,
@@ -52,11 +52,11 @@ def test_claude_create_and_run_job(
     llm_question = "What is 10+10?"
     llm_response = "10 + 10 = 20"
 
-    conversations: list[BatchInputItem] = []
+    conversations: list[PreBatchRecordInput] = []
     for i in range(100):
-        conversation = BatchInputItem(
-            record_id=f"EXAMPLE_RECORD_{i}",
-            model_input=[
+        conversation = PreBatchRecordInput(
+            recordId=f"EXAMPLE_RECORD_{i}",
+            modelInput=[
                 LLMMessage(
                     role="user",
                     content=[TextContent(text=llm_question)],
