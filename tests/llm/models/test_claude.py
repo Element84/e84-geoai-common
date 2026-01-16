@@ -35,7 +35,9 @@ def test_basic_usage() -> None:
     llm = BedrockClaudeLLM(
         client=make_test_bedrock_runtime_client([claude_response_with_content("olleh")])
     )
-    config = LLMInferenceConfig()
+    config = LLMInferenceConfig(
+        system_prompt='You are a helpful assistant. end each sentence with "hello world".'
+    )
     resp = llm.prompt(
         [LLMUserMessage(content="Output the word hello backwards and only that.")], config
     )

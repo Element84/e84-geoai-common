@@ -20,6 +20,7 @@ from mypy_boto3_bedrock.type_defs import (
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     claude_response_with_content,
     nova_response_with_content,
+    titanv2_response,
 )
 
 USE_REAL_BATCH_BEDROCK_CLIENT = os.getenv("USE_REAL_BATCH_BEDROCK_CLIENT") == "true"
@@ -63,6 +64,31 @@ def batch_nova_output_example(question: str, content: str, lines: int = 5) -> st
         },
         "modelOutput": nova_response_with_content(content),
         "recordId": "RECORD0000000009",
+    }
+
+    json_lines: list[str] = []
+    for _ in range(lines):
+        json_object_string = json.dumps(example_response)
+
+        json_lines.append(json_object_string)
+    body = "\n".join(json_lines)
+    return body
+
+
+def batch_titanv2_output_example(
+    input_text: str,
+    embedding: list[float],
+    overrides: dict[str, Any],
+    lines: int = 5,
+    record_id_example: str = "RECORD0000000098",
+) -> str:
+    """Creates a mock TitanV2 batch response with the given embedding."""
+    example_response = {
+        "modelInput": {
+            "inputText": input_text,
+        },
+        "modelOutput": titanv2_response(embedding=embedding, overrides=overrides),
+        "recordId": record_id_example,
     }
 
     json_lines: list[str] = []
