@@ -17,6 +17,13 @@ from e84_geoai_common.util import ensure_bucket_exists
 ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
 
 
+class BatchInputItem(BaseModel):
+    """Preliminary input record for batch before applying model."""
+
+    record_id: str | None = None
+    model_input: list[LLMMessage]
+
+
 class BatchRecordInput[RequestModel: BaseModel](BaseModel):
     """Single input record for batch inference."""
 
@@ -189,7 +196,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         role_arn: str,
         input_s3_file_url: str,
         output_s3_directory_url: str,
-        conversations: list[list[LLMMessage]] | None = None,
+        conversations: list[list[LLMMessage]] | list[BatchInputItem] | None = None,
         inference_cfg: LLMInferenceConfig | None = None,
         *,
         create_buckets_if_missing: bool = False,
@@ -236,7 +243,9 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         self, input_s3_file_url: str, output_s3_directory_url: str
     ) -> tuple[str, str, str]:
         """Return the bucket names and key(s) from an S3 URI."""
-        if not input_s3_file_url.startswith("s3://") or not input_s3_file_url.startswith("s3://"):
+        if not input_s3_file_url.startswith("s3://") or not output_s3_directory_url.startswith(
+            "s3://"
+        ):
             msg = (
                 f"Invalid S3 URI {input_s3_file_url} or {output_s3_directory_url}."
                 f"Must start with 's3://'."
@@ -267,14 +276,25 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         return input_bucket, input_key, output_bucket
 
     def _parse_conversations(
-        self, conversations: list[list[LLMMessage]], inference_config: LLMInferenceConfig
+        self,
+        conversations: list[list[LLMMessage]] | list[BatchInputItem],
+        inference_config: LLMInferenceConfig,
     ) -> list[BatchRecordInput[RequestModel]]:
         input_requests: list[BatchRecordInput[RequestModel]] = []
         for i, conversation in enumerate(conversations):
-            msg: Any = self.llm.create_request(messages=conversation, config=inference_config)
+            record_id = f"RECORD{i:010d}"
+
+            if isinstance(conversation, BatchInputItem):
+                messages = conversation.model_input
+                if conversation.record_id:
+                    record_id = conversation.record_id
+            else:
+                messages = conversation
+
+            msg: Any = self.llm.create_request(messages=messages, config=inference_config)
 
             record = BatchRecordInput[self.request_model](
-                recordId=f"RECORD{i:010d}",
+                recordId=record_id,
                 modelInput=self.request_model.model_validate(msg),
             )
             input_requests.append(record)

@@ -4,9 +4,7 @@ import pytest
 from moto import mock_aws
 from mypy_boto3_s3 import S3Client
 
-from e84_geoai_common.llm.batch import (
-    BedrockBatchInference,
-)
+from e84_geoai_common.llm.batch import BatchInputItem, BedrockBatchInference
 from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage, TextContent
 from e84_geoai_common.llm.models.claude import (
     CLAUDE_3_5_HAIKU,
@@ -54,17 +52,21 @@ def test_claude_create_and_run_job(
     llm_question = "What is 10+10?"
     llm_response = "10 + 10 = 20"
 
-    conversations: list[list[LLMMessage]] = []
-    for _ in range(100):
-        conversation = [
-            LLMMessage(
-                role="user",
-                content=[TextContent(text=llm_question)],
-            )
-        ]
+    conversations: list[BatchInputItem] = []
+    for i in range(100):
+        conversation = BatchInputItem(
+            record_id=f"EXAMPLE_RECORD_{i}",
+            model_input=[
+                LLMMessage(
+                    role="user",
+                    content=[TextContent(text=llm_question)],
+                )
+            ],
+        )
         conversations.append(conversation)
-
-    batch_response = batch_claude_output_example(llm_question, llm_response)
+    batch_response = batch_claude_output_example(
+        llm_question, llm_response, record_id_example="EXAMPLE_RECORD_1"
+    )
 
     batch = BedrockBatchInference(
         request_model=ClaudeInvokeLLMRequest,
@@ -92,6 +94,7 @@ def test_claude_create_and_run_job(
         assert result.modelOutput is not None
         assert isinstance(result.modelOutput, ClaudeResponse)
         assert result.modelOutput.content[0] == ClaudeTextContent(text=llm_response)
+        assert result.recordId.startswith("EXAMPLE_RECORD_")
 
 
 def test_nova_create_and_run_job(
@@ -143,3 +146,4 @@ def test_nova_create_and_run_job(
         assert result.modelOutput is not None
         assert isinstance(result.modelOutput, NovaResponse)
         assert result.modelOutput.output.message.content[0] == NovaTextContent(text=llm_response)
+        assert result.recordId.startswith("RECORD")  # default value

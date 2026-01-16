@@ -30,7 +30,9 @@ BATCH_INPUT_S3 = os.getenv(
 BATCH_OUTPUT_S3 = os.getenv("BATCH_OUTPUT_S3", "s3://example-output-bucket-e84-geoai-common/")
 
 
-def batch_claude_output_example(question: str, content: str, lines: int = 5) -> str:
+def batch_claude_output_example(
+    question: str, content: str, lines: int = 5, record_id_example: str = "RECORD0000000098"
+) -> str:
     """Creates a mock claude batch response with the given text."""
     example_response = {
         "modelInput": {
@@ -40,7 +42,7 @@ def batch_claude_output_example(question: str, content: str, lines: int = 5) -> 
             "temperature": 0.0,
         },
         "modelOutput": claude_response_with_content(content),
-        "recordId": "RECORD0000000098",
+        "recordId": record_id_example,
     }
 
     json_lines: list[str] = []
