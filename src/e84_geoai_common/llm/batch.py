@@ -19,6 +19,8 @@ from e84_geoai_common.util import ensure_bucket_exists
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
+MIN_RECORDS_PER_BATCH_JOB = 100
+DEFAULT_MAX_RECORDS_PER_BATCH_JOB = 50000
 
 ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
 ValidEmbedders = TitanV2  # Placeholder for future embedder support
@@ -309,7 +311,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         inference_cfg: LLMInferenceConfig | EmbedderInferenceConfig | None = None,
         *,
         max_records_per_file: int = 10000,
-        max_records_per_job: int = 50000,  # Bedrock default hard limit
+        max_records_per_job: int = DEFAULT_MAX_RECORDS_PER_BATCH_JOB,  # Bedrock default hard limit
         create_buckets_if_missing: bool = False,
     ) -> str:
         """Creates and invokes batch job."""
@@ -338,6 +340,13 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
                 )
                 raise ValueError(msg)
 
+            if len(conversations) < MIN_RECORDS_PER_BATCH_JOB:
+                msg = (
+                    f"Number of records {len(conversations)} is less than the minimum required"
+                    f" {MIN_RECORDS_PER_BATCH_JOB}."
+                )
+                raise ValueError(msg)
+
             if inference_cfg is None:
                 inference_cfg = LLMInferenceConfig()
 
@@ -358,6 +367,8 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
                     )
                     self._upload_conversations(chunk, input_bucket, chunk_input_key)
             else:
+                if input_directory_given:
+                    input_bucket_key = f"{input_bucket_key}input.jsonl"
                 self._upload_conversations(
                     model_specific_conversations, input_bucket, input_bucket_key
                 )
