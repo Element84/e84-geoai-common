@@ -168,7 +168,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         return results
 
     def get_llm_results_raw(
-        self, job_arn: str
+        self, job_arn: str, llm_inference_config: LLMInferenceConfig | None = None
     ) -> list[BatchRecordOutput[RequestModel, LLMMessage]]:
         """Returns the results of the job as LLMMessages. Returns an error it is not done yet."""
         raw_results = self.get_results(job_arn)
@@ -183,7 +183,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             if model_output is not None:
                 model_output = self.llm.response_to_llm_message(
                     model_output,  # pyright: ignore[reportArgumentType]
-                    LLMInferenceConfig(),
+                    llm_inference_config or LLMInferenceConfig(),
                 )
 
             llm_result = BatchRecordOutput[self.request_model, LLMMessage](
