@@ -46,6 +46,7 @@ CLAUDE_4_OPUS = "us.anthropic.claude-opus-4-20250514-v1:0"
 CLAUDE_4_1_OPUS = "us.anthropic.claude-opus-4-1-20250805-v1:0"
 CLAUDE_4_5_HAIKU = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 CLAUDE_4_5_SONNET = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+CLAUDE_4_5_OPUS = "us.anthropic.claude-opus-4-5-20251101-v1:0"
 
 
 _MODELS_NOT_SUPPORTING_CACHING = {
@@ -75,6 +76,8 @@ CLAUDE_BEDROCK_MODEL_IDS = {
     "Claude 3.5 Sonnet v2": CLAUDE_3_5_SONNET_V2,
     "Claude 3.7 Sonnet": CLAUDE_3_7_SONNET,
     "Claude 4 Sonnet": CLAUDE_4_SONNET,
+    "Claude 4.1 Opus": CLAUDE_4_1_OPUS,
+    "Claude 4.5 Opus": CLAUDE_4_5_OPUS,
     # We won't add any new models to this as we want to remove it eventually.
 }
 
