@@ -452,7 +452,7 @@ class BedrockClaudeLLM(LLM):
             raise ValueError("Must specify at least one message.")
         request = self.create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        llm_msg = self._response_to_llm_message(response, inference_cfg=inference_cfg)
+        llm_msg = self.response_to_llm_message(response, inference_cfg=inference_cfg)
         return llm_msg
 
     @timed_function
@@ -481,7 +481,7 @@ class BedrockClaudeLLM(LLM):
         )
         return claude_response
 
-    def _response_to_llm_message(
+    def response_to_llm_message(
         self, response: ClaudeResponse, inference_cfg: LLMInferenceConfig
     ) -> LLMAssistantMessage:
         def _to_llm_content(
