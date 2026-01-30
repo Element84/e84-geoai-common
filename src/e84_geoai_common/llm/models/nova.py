@@ -33,6 +33,8 @@ NOVA_LITE = "us.amazon.nova-lite-v1:0"
 NOVA_MICRO = "us.amazon.nova-micro-v1:0"
 NOVA_PRO = "us.amazon.nova-pro-v1:0"
 NOVA_REEL = "us.amazon.nova-reel-v1:0"
+NOVA_2_LITE = "us.amazon.nova-2-lite-v1:0"
+NOVA_2_PRO = "us.amazon.nova-2-pro-v1:0"
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
 # DEPRECATED: Use the constants above instead.
@@ -42,6 +44,8 @@ NOVA_BEDROCK_MODEL_IDS = {
     "Nova Micro": NOVA_MICRO,
     "Nova Pro": NOVA_PRO,
     "Nova Reel": NOVA_REEL,
+    "Nova 2 Lite": NOVA_2_LITE,
+    "Nova 2 Pro": NOVA_2_PRO,
 }
 
 NovaImageFormat = Literal["jpeg", "png", "gif", "webp"]

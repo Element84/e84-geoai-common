@@ -1,3 +1,5 @@
+# ruff: noqa: PTH118
+from os.path import join
 from time import sleep
 from typing import Any, Literal, cast
 
@@ -38,6 +40,10 @@ BatchStatus = Literal[
     "Stopped",
     "Stopping",
 ]
+
+
+class BatchMaxConcurrencyExceededError(Exception):
+    """Raised when the maximum concurrency for batch jobs is exceeded."""
 
 
 class BatchInputItem(BaseModel):
@@ -313,67 +319,36 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         max_records_per_file: int = 10000,
         max_records_per_job: int = DEFAULT_MAX_RECORDS_PER_BATCH_JOB,  # Bedrock default hard limit
         create_buckets_if_missing: bool = False,
-    ) -> str:
+    ) -> BatchLLMRequest:
         """Creates and invokes batch job."""
         # check to make sure that these parse and error check correctly
         input_bucket, input_bucket_key, output_bucket = self._parse_s3_urls(
             input_s3_file_url, output_s3_directory_url
         )
 
-        input_directory_given = False
-        if input_bucket_key == "" or input_bucket_key.endswith("/"):
-            input_directory_given = True
-
         ensure_bucket_exists(
-            self.s3_client, input_bucket, create_buckets_if_missing=create_buckets_if_missing
+            self.s3_client,
+            input_bucket,
+            create_buckets_if_missing=create_buckets_if_missing,
         )
         ensure_bucket_exists(
-            self.s3_client, output_bucket, create_buckets_if_missing=create_buckets_if_missing
+            self.s3_client,
+            output_bucket,
+            create_buckets_if_missing=create_buckets_if_missing,
         )
 
         # Upload files if conversations exist
         if conversations:
-            if len(conversations) > max_records_per_job:
-                msg = (
-                    f"Number of records {len(conversations)} exceeds the maximum allowed"
-                    f" {max_records_per_job}."
-                )
-                raise ValueError(msg)
+            self._create_s3_inputs(
+                conversations=conversations,
+                input_bucket=input_bucket,
+                input_bucket_key=input_bucket_key,
+                inference_cfg=inference_cfg,
+                max_records_per_file=max_records_per_file,
+                max_records_per_job=max_records_per_job,
+            )
 
-            if len(conversations) < MIN_RECORDS_PER_BATCH_JOB:
-                msg = (
-                    f"Number of records {len(conversations)} is less than the minimum required"
-                    f" {MIN_RECORDS_PER_BATCH_JOB}."
-                )
-                raise ValueError(msg)
-
-            if inference_cfg is None:
-                inference_cfg = LLMInferenceConfig()
-
-            model_specific_conversations = self._parse_conversations(conversations, inference_cfg)
-
-            if len(conversations) > max_records_per_file:
-                if input_directory_given is False:
-                    msg = (
-                        "You have more records than the records_per_file limit, but the"
-                        "input uri is not a directory so multiple files cannot be created."
-                    )
-                    raise ValueError(msg)
-
-                for file_idx in range(0, len(model_specific_conversations), max_records_per_file):
-                    chunk = model_specific_conversations[file_idx : file_idx + max_records_per_file]
-                    chunk_input_key = (
-                        f"{input_bucket_key}part{file_idx // max_records_per_file}.jsonl"
-                    )
-                    self._upload_conversations(chunk, input_bucket, chunk_input_key)
-            else:
-                if input_directory_given:
-                    input_bucket_key = f"{input_bucket_key}input.jsonl"
-                self._upload_conversations(
-                    model_specific_conversations, input_bucket, input_bucket_key
-                )
-
-        request = BatchLLMRequest(
+        return BatchLLMRequest(
             roleArn=role_arn,
             jobName=job_name,
             modelId=self.llm.model_id,
@@ -385,10 +360,17 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             ),
         )
 
-        # invoke with request
-        response = self.bedrock_client.create_model_invocation_job(
-            **request.model_dump(exclude_none=True)
-        )
+    def submit_job(self, job: BatchLLMRequest) -> str:
+        """Submits a pre-built batch job and returns the job ARN."""
+        try:
+            response = self.bedrock_client.create_model_invocation_job(
+                **job.model_dump(exclude_none=True)
+            )
+        except self.bedrock_client.exceptions.ServiceQuotaExceededException as e:
+            raise BatchMaxConcurrencyExceededError(
+                "Maximum concurrency for batch jobs has been exceeded."
+            ) from e
+
         return response.get("jobArn")
 
     def _parse_s3_urls(
@@ -451,6 +433,54 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             )
             input_requests.append(record)
         return input_requests
+
+    def _create_s3_inputs(  # noqa: PLR0913
+        self,
+        conversations: list[list[LLMMessage]] | list[BatchInputItem],
+        input_bucket: str,
+        input_bucket_key: str,
+        inference_cfg: LLMInferenceConfig | EmbedderInferenceConfig | None = None,
+        *,
+        max_records_per_file: int = 10000,
+        max_records_per_job: int = DEFAULT_MAX_RECORDS_PER_BATCH_JOB,
+    ) -> None:
+        if len(conversations) > max_records_per_job:
+            msg = (
+                f"Number of records {len(conversations)} exceeds the maximum allowed"
+                f" {max_records_per_job}."
+            )
+            raise ValueError(msg)
+
+        if len(conversations) < MIN_RECORDS_PER_BATCH_JOB:
+            msg = (
+                f"Number of records {len(conversations)} is less than the minimum required"
+                f" {MIN_RECORDS_PER_BATCH_JOB}."
+            )
+            raise ValueError(msg)
+
+        if inference_cfg is None:
+            inference_cfg = LLMInferenceConfig()
+
+        model_specific_conversations = self._parse_conversations(conversations, inference_cfg)
+
+        is_directory = input_bucket_key == "" or input_bucket_key.endswith("/")
+        if len(conversations) > max_records_per_file:
+            if is_directory is False:
+                msg = (
+                    "You have more records than the records_per_file limit, but the"
+                    "input URI is not a directory so multiple files cannot be created."
+                )
+                raise ValueError(msg)
+
+            for file_idx in range(0, len(model_specific_conversations), max_records_per_file):
+                chunk = model_specific_conversations[file_idx : file_idx + max_records_per_file]
+                chunk_num = file_idx // max_records_per_file
+                chunk_input_key = join(input_bucket_key, f"part_{chunk_num}.jsonl")
+                self._upload_conversations(chunk, input_bucket, chunk_input_key)
+        else:
+            if is_directory:
+                input_bucket_key = join(input_bucket_key, "input.jsonl")
+            self._upload_conversations(model_specific_conversations, input_bucket, input_bucket_key)
 
     def _upload_conversations(
         self,
