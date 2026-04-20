@@ -1,11 +1,17 @@
 from time import sleep
-from typing import Any
+from typing import Any, Literal, cast
 
 import boto3
 from mypy_boto3_bedrock import BedrockClient
 from mypy_boto3_s3 import S3Client
 from pydantic import BaseModel, ConfigDict
 
+from e84_geoai_common.embedder.embedder import (
+    EmbedderInferenceConfig,
+    EmbedderInput,
+    EmbedderResponse,
+)
+from e84_geoai_common.embedder.titan_v2 import TitanV2
 from e84_geoai_common.llm.core.llm import LLMInferenceConfig, LLMMessage
 from e84_geoai_common.llm.models.claude import BedrockClaudeLLM
 from e84_geoai_common.llm.models.nova import BedrockNovaLLM
@@ -13,15 +19,32 @@ from e84_geoai_common.util import ensure_bucket_exists
 
 # Batch inference uses camel case for its variables. Ignore any linting problems with this.
 # ruff: noqa: N815
+MIN_RECORDS_PER_BATCH_JOB = 100
+DEFAULT_MAX_RECORDS_PER_BATCH_JOB = 50000
 
 ValidBatchLLMs = BedrockClaudeLLM | BedrockNovaLLM
+ValidEmbedders = TitanV2  # Placeholder for future embedder support
+
+# https://docs.aws.amazon.com/bedrock/latest/APIReference/API_ModelInvocationJobSummary.html
+BatchStatus = Literal[
+    "Submitted",
+    "Validating",
+    "Scheduled",
+    "Expired",
+    "InProgress",
+    "Completed",
+    "PartiallyCompleted",
+    "Failed",
+    "Stopped",
+    "Stopping",
+]
 
 
 class BatchInputItem(BaseModel):
     """Preliminary input record for batch before applying model."""
 
     record_id: str | None = None
-    model_input: list[LLMMessage]
+    model_input: list[LLMMessage] | EmbedderInput
 
 
 class BatchRecordInput[RequestModel: BaseModel](BaseModel):
@@ -29,6 +52,15 @@ class BatchRecordInput[RequestModel: BaseModel](BaseModel):
 
     recordId: str
     modelInput: RequestModel
+
+
+class BatchResponseError(BaseModel):
+    """Error model for batch response."""
+
+    errorCode: int
+    errorMessage: str
+    expired: bool
+    retryable: bool
 
 
 class BatchRecordOutput[RequestModel: BaseModel, ResponseModel: BaseModel](BaseModel):
@@ -39,7 +71,7 @@ class BatchRecordOutput[RequestModel: BaseModel, ResponseModel: BaseModel](BaseM
     recordId: str
     modelInput: RequestModel
     modelOutput: ResponseModel | None = None
-    error: RequestModel | None = None
+    error: BatchResponseError | None = None
 
 
 class S3InputDataConfig(BaseModel):
@@ -79,7 +111,7 @@ class BatchLLMRequest(BaseModel):
 class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
     def __init__(
         self,
-        llm: ValidBatchLLMs,
+        llm: ValidBatchLLMs | ValidEmbedders,
         request_model: type[RequestModel],
         response_model: type[ResponseModel],
         bedrock_client: BedrockClient | None = None,
@@ -116,24 +148,81 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
         job_id = job_arn.split("/")[-1]
 
-        input_data_config = job_details["inputDataConfig"]
-        s3_input_config = input_data_config["s3InputDataConfig"]
-        input_uri = s3_input_config["s3Uri"]
-        input_filename = input_uri.split("/")[-1]
+        output_uri = job_details["outputDataConfig"]["s3OutputDataConfig"]["s3Uri"]
 
-        output_data_config = job_details["outputDataConfig"]
-        s3_output_config = output_data_config["s3OutputDataConfig"]
-        output_uri = s3_output_config["s3Uri"]
-        path_part = output_uri[5:]  # Remove s3://
-        parts = path_part.split("/", 1)  # Split on first /
+        output_bucket, output_prefix_key = output_uri.replace("s3://", "").split("/", 1)
 
-        output_bucket = parts[0]
-        output_prefix_key = ""
-        if len(parts) > 1 and parts[1]:
-            output_prefix_key = parts[1]
+        response = self.s3_client.list_objects_v2(
+            Bucket=output_bucket, Prefix=f"{output_prefix_key}{job_id}/"
+        )
+        output_uris = [
+            obj["Key"] for obj in response.get("Contents", []) if obj["Key"].endswith("jsonl.out")
+        ]
 
-        final_output_key = f"{output_prefix_key}{job_id}/{input_filename}.out"
-        return self._validate_results(output_bucket, final_output_key)
+        results: list[BatchRecordOutput[RequestModel, ResponseModel]] = []
+        for output_uri in output_uris:
+            output_filename = output_uri.split("/")[-1]
+
+            final_output_key = f"{output_prefix_key}{job_id}/{output_filename}"
+            results.extend(self._validate_results(output_bucket, final_output_key))
+        return results
+
+    def get_llm_results_raw(
+        self, job_arn: str, llm_inference_config: LLMInferenceConfig | None = None
+    ) -> list[BatchRecordOutput[RequestModel, LLMMessage]]:
+        """Returns the results of the job as LLMMessages. Returns an error it is not done yet."""
+        raw_results = self.get_results(job_arn)
+
+        if not isinstance(self.llm, ValidBatchLLMs):
+            msg = "get_llm_results_raw can only be called when using an LLM model."
+            raise TypeError(msg)
+
+        llm_message_results: list[BatchRecordOutput[RequestModel, LLMMessage]] = []
+        for result in raw_results:
+            model_output = result.modelOutput
+            if model_output is not None:
+                model_output = self.llm.response_to_llm_message(
+                    model_output,  # pyright: ignore[reportArgumentType]
+                    llm_inference_config or LLMInferenceConfig(),
+                )
+
+            llm_result = BatchRecordOutput[self.request_model, LLMMessage](
+                recordId=result.recordId,
+                modelInput=result.modelInput,
+                modelOutput=model_output,
+                error=result.error,
+            )
+            llm_message_results.append(llm_result)
+
+        return llm_message_results
+
+    def get_embedder_results_raw(
+        self, job_arn: str
+    ) -> list[BatchRecordOutput[RequestModel, EmbedderResponse]]:
+        """Returns the results of the job as EmbedderInput. Returns an error it is not done yet."""
+        raw_results = self.get_results(job_arn)
+
+        if not isinstance(self.llm, ValidEmbedders):
+            msg = "get_embedder_results_raw can only be called when using an Embedder model."
+            raise TypeError(msg)
+
+        embedder_results: list[BatchRecordOutput[RequestModel, EmbedderResponse]] = []
+        for result in raw_results:
+            model_output = result.modelOutput
+            if model_output is not None:
+                model_output = self.llm.response_to_embedder_response(
+                    model_output,  # pyright: ignore[reportArgumentType]
+                )
+
+            embedder_result = BatchRecordOutput[self.request_model, EmbedderResponse](
+                recordId=result.recordId,
+                modelInput=result.modelInput,
+                modelOutput=model_output,
+                error=result.error,
+            )
+            embedder_results.append(embedder_result)
+
+        return embedder_results
 
     def _validate_results(
         self,
@@ -149,11 +238,33 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
         return output_messages
 
-    def wait_for_job_to_finish(self, job_arn: str) -> None:
+    @staticmethod
+    def results_contains_errors(
+        results: list[BatchRecordOutput[RequestModel, ResponseModel]],
+    ) -> bool:
+        """Returns True if any of the results contain errors."""
+        return any(result.error is not None for result in results)
+
+    def get_job_status(self, job_arn: str) -> BatchStatus:
+        """Returns True if the job is finished, False otherwise."""
+        response = self.bedrock_client.get_model_invocation_job(jobIdentifier=job_arn)
+        return response.get("status")
+
+    def is_completed(self, job_arn: str) -> bool:
+        """Returns True if the job is finished, False otherwise."""
+        status = self.get_job_status(job_arn)
+        return status == "Completed"
+
+    def is_failed(self, job_arn: str) -> bool:
+        """Returns True if the job is a terminal state and failed, False otherwise."""
+        status = self.get_job_status(job_arn)
+        return status in ["Failed", "Stopping", "Stopped"]
+
+    def wait_for_job_to_finish(self, job_arn: str, poll_interval_seconds: int = 30) -> None:
         """Returns once the job has either finished or failed."""
         while True:
             response = self.bedrock_client.get_model_invocation_job(jobIdentifier=job_arn)
-            status = response.get("status")
+            status: BatchStatus = response.get("status")
 
             if status == "Completed":
                 break
@@ -165,7 +276,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
                 )
                 raise RuntimeError(error_details)
 
-            sleep(30)
+            sleep(poll_interval_seconds)
 
     def get_job_arn(self, job_name: str) -> str:
         """Returns job arn given the job name."""
@@ -197,8 +308,10 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         input_s3_file_url: str,
         output_s3_directory_url: str,
         conversations: list[list[LLMMessage]] | list[BatchInputItem] | None = None,
-        inference_cfg: LLMInferenceConfig | None = None,
+        inference_cfg: LLMInferenceConfig | EmbedderInferenceConfig | None = None,
         *,
+        max_records_per_file: int = 10000,
+        max_records_per_job: int = DEFAULT_MAX_RECORDS_PER_BATCH_JOB,  # Bedrock default hard limit
         create_buckets_if_missing: bool = False,
     ) -> str:
         """Creates and invokes batch job."""
@@ -206,6 +319,10 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
         input_bucket, input_bucket_key, output_bucket = self._parse_s3_urls(
             input_s3_file_url, output_s3_directory_url
         )
+
+        input_directory_given = False
+        if input_bucket_key == "" or input_bucket_key.endswith("/"):
+            input_directory_given = True
 
         ensure_bucket_exists(
             self.s3_client, input_bucket, create_buckets_if_missing=create_buckets_if_missing
@@ -216,10 +333,45 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
         # Upload files if conversations exist
         if conversations:
+            if len(conversations) > max_records_per_job:
+                msg = (
+                    f"Number of records {len(conversations)} exceeds the maximum allowed"
+                    f" {max_records_per_job}."
+                )
+                raise ValueError(msg)
+
+            if len(conversations) < MIN_RECORDS_PER_BATCH_JOB:
+                msg = (
+                    f"Number of records {len(conversations)} is less than the minimum required"
+                    f" {MIN_RECORDS_PER_BATCH_JOB}."
+                )
+                raise ValueError(msg)
+
             if inference_cfg is None:
                 inference_cfg = LLMInferenceConfig()
+
             model_specific_conversations = self._parse_conversations(conversations, inference_cfg)
-            self._upload_conversations(model_specific_conversations, input_bucket, input_bucket_key)
+
+            if len(conversations) > max_records_per_file:
+                if input_directory_given is False:
+                    msg = (
+                        "You have more records than the records_per_file limit, but the"
+                        "input uri is not a directory so multiple files cannot be created."
+                    )
+                    raise ValueError(msg)
+
+                for file_idx in range(0, len(model_specific_conversations), max_records_per_file):
+                    chunk = model_specific_conversations[file_idx : file_idx + max_records_per_file]
+                    chunk_input_key = (
+                        f"{input_bucket_key}part{file_idx // max_records_per_file}.jsonl"
+                    )
+                    self._upload_conversations(chunk, input_bucket, chunk_input_key)
+            else:
+                if input_directory_given:
+                    input_bucket_key = f"{input_bucket_key}input.jsonl"
+                self._upload_conversations(
+                    model_specific_conversations, input_bucket, input_bucket_key
+                )
 
         request = BatchLLMRequest(
             roleArn=role_arn,
@@ -251,12 +403,6 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
                 f"Must start with 's3://'."
             )
             raise ValueError(msg)
-        if input_s3_file_url.endswith("/"):
-            msg = (
-                f"Invalid Input S3 URI {input_s3_file_url}. Must be a filename,"
-                "but found a directory."
-            )
-            raise ValueError(msg)
         if not output_s3_directory_url.endswith("/"):
             msg = (
                 f"Invalid Output S3 URI {output_s3_directory_url}. Must be a directory, but found a"
@@ -264,11 +410,8 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             )
             raise ValueError(msg)
         input_parts = input_s3_file_url[5:].split("/", 1)
-        if len(input_parts) <= 1:
-            msg = f"Invalid Input S3 URI {input_s3_file_url}. Must have a file path."
-            raise ValueError(msg)
+        input_key = "" if len(input_parts) <= 1 else input_parts[1]
         input_bucket = input_parts[0]
-        input_key = input_parts[1]
 
         output_parts = output_s3_directory_url[5:].split("/", 1)
         output_bucket = output_parts[0]
@@ -278,7 +421,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
     def _parse_conversations(
         self,
         conversations: list[list[LLMMessage]] | list[BatchInputItem],
-        inference_config: LLMInferenceConfig,
+        inference_config: LLMInferenceConfig | EmbedderInferenceConfig,
     ) -> list[BatchRecordInput[RequestModel]]:
         input_requests: list[BatchRecordInput[RequestModel]] = []
         for i, conversation in enumerate(conversations):
@@ -291,7 +434,16 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             else:
                 messages = conversation
 
-            msg: Any = self.llm.create_request(messages=messages, config=inference_config)
+            if isinstance(self.llm, ValidBatchLLMs):
+                messages = cast("list[LLMMessage]", messages)
+                inference_config = cast("LLMInferenceConfig", inference_config)
+                msg: Any = self.llm.create_request(messages=messages, config=inference_config)
+            else:
+                input_text = cast("EmbedderInput", messages)
+                inference_config = cast("EmbedderInferenceConfig", inference_config)
+                msg: Any = self.llm.create_request(
+                    embedder_input=input_text, config=inference_config
+                )
 
             record = BatchRecordInput[self.request_model](
                 recordId=record_id,

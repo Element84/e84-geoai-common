@@ -95,6 +95,22 @@ def converse_response_with_content(
     return out
 
 
+def titanv2_response(
+    embedding: list[float], overrides: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Creates a mock claude response with the given content."""
+    out = {
+        "embedding": embedding,
+        "inputTextTokenCount": 300,
+        "embeddingsByType": {
+            "float": embedding,
+        },
+    }
+    if overrides is not None:
+        out.update(overrides)
+    return out
+
+
 class _MockBedrockRuntimeClient(BedrockRuntimeClient):
     """Implements the bedrock runtime client to return a set of canned responses."""
 
