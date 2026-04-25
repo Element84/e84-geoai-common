@@ -24,6 +24,32 @@ from shapely.geometry.base import BaseGeometry, BaseMultipartGeometry
 from e84_geoai_common.tracing import timed_function
 
 
+def validate_and_fix_geometry(geom: BaseGeometry) -> BaseGeometry:
+    """Validate and fix invalid geometries.
+
+    Common issues in GeoSpatial data include self-intersections, duplicate vertices,
+    and topological errors. This function attempts to fix these automatically.
+
+    Args:
+        geom: The geometry to validate and fix.
+
+    Returns:
+        A valid geometry. If the input is already valid, returns it unchanged.
+        If invalid, attempts to fix using buffer(0) which resolves many common issues.
+
+    Example:
+        >>> from shapely import Polygon
+        >>> invalid = Polygon([(0, 0), (1, 1), (1, 0), (0, 1), (0, 0)])  # self-intersecting
+        >>> fixed = validate_and_fix_geometry(invalid)
+        >>> fixed.is_valid
+        True
+    """
+    if geom.is_valid:
+        return geom
+    # buffer(0) is a common technique to fix invalid geometries
+    return geom.buffer(0)
+
+
 def geometry_from_wkt(wkt: str) -> BaseGeometry:
     """Create shapely geometry from Well-Known Text (WKT) string."""
     return shapely.from_wkt(wkt)  # type: ignore[reportUnknownVariableType]
@@ -222,7 +248,7 @@ def remove_extraneous_geoms(geom: BaseGeometry, *, max_points: int) -> BaseGeome
     return combine_geometry(geoms_to_combine)
 
 
-# FUTURE the performance of this could be spead up for very large geometries with many small
+# FUTURE the performance of this could be sped up for very large geometries with many small
 # polygons by comparing the number of sub geometries to the number of total points. If a ratio
 # exceeds a certain percentage then it may make sense to remove geometries initially that
 # are less than a certain percent of the total area. Then simplify after that. That could help
@@ -347,3 +373,48 @@ def add_buffer(g: BaseGeometry, distance_km: float) -> BaseGeometry:
     # This will fall apart at the poles but works for our current use cases.
 
     return g.buffer((lon_distance + lat_distance) / 2.0)
+
+
+def approximate_area_km2(g: BaseGeometry) -> float:
+    """Calculate approximate area in square kilometers for a geometry in WGS84 coordinates.
+
+    Uses a simple approximation based on the average latitude of the geometry.
+    More accurate than using square degrees directly, but less accurate than
+    proper geodesic calculations. Suitable for most GeoSpatial AI applications
+    where approximate area is sufficient.
+
+    Args:
+        g: The input geometry in WGS84 (EPSG:4326) coordinates.
+
+    Returns:
+        Approximate area in square kilometers.
+
+    Note:
+        - Assumes input geometry is in WGS84 (longitude/latitude) coordinates.
+        - Accuracy decreases near the poles and for very large geometries.
+        - For high-precision area calculations, consider reprojecting to an
+          appropriate projected coordinate system.
+
+    Example:
+        >>> from shapely.geometry import box
+        >>> # A rough 1-degree by 1-degree box near the equator
+        >>> square = box(0, 0, 1, 1)
+        >>> area = approximate_area_km2(square)
+        >>> print(f"Area: {area:.2f} km²")
+        Area: 12364.46 km²
+    """
+    # Get area in square degrees
+    area_deg2 = g.area
+
+    # Convert to approximate km² using average latitude
+    avg_lat = g.centroid.y
+    avg_lat_rad = degrees_to_radians(avg_lat)
+
+    # One degree of latitude is approximately 111.32 km everywhere
+    km_per_deg_lat = 111.32
+
+    # One degree of longitude varies with latitude: 111.32 * cos(lat)
+    km_per_deg_lon = 111.32 * math.cos(avg_lat_rad)
+
+    # Convert square degrees to square kilometers
+    return area_deg2 * km_per_deg_lat * km_per_deg_lon

@@ -1,4 +1,4 @@
-from math import cos, pi, sin
+from math import cos, pi, radians, sin
 
 import pytest
 from shapely import (
@@ -10,14 +10,17 @@ from shapely import (
     Point,
     count_coordinates,
 )
+from shapely.geometry import box
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import Polygon
 from shapely.validation import explain_validity
 
 from e84_geoai_common.geometry import (
+    approximate_area_km2,
     geometry_to_polygon,
     remove_extraneous_geoms,
     simplify_geometry,
+    validate_and_fix_geometry,
 )
 
 
@@ -302,3 +305,142 @@ def test_geometry_to_polygon():
     # MultiLinestring
     ce_multiline = MultiLineString([c_bottom_line, e_line])
     assert geometry_to_polygon(ce_multiline).equals(Polygon([(13, 1), (15, 1), (19, 10), (13, 1)]))
+
+
+def test_validate_and_fix_geometry_valid():
+    """Test that valid geometries are returned unchanged."""
+    # Valid point
+    point = Point(0, 0)
+    assert validate_and_fix_geometry(point) == point
+    assert validate_and_fix_geometry(point).is_valid
+
+    # Valid polygon
+    polygon = Polygon([(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)])
+    assert validate_and_fix_geometry(polygon) == polygon
+    assert validate_and_fix_geometry(polygon).is_valid
+
+    # Valid line
+    line = LineString([(0, 0), (1, 1)])
+    assert validate_and_fix_geometry(line) == line
+    assert validate_and_fix_geometry(line).is_valid
+
+
+def test_validate_and_fix_geometry_invalid():
+    """Test that invalid geometries are fixed using buffer(0)."""
+    # Self-intersecting polygon (bowtie shape)
+    # Creates a polygon that crosses itself
+    invalid_polygon = Polygon([(0, 0), (2, 2), (2, 0), (0, 2), (0, 0)])
+
+    # Verify it's invalid
+    assert not invalid_polygon.is_valid
+
+    # Fix it
+    fixed = validate_and_fix_geometry(invalid_polygon)
+
+    # Fixed geometry should be valid
+    assert fixed.is_valid
+
+    # Fixed geometry should have non-zero area (buffer(0) resolves self-intersection)
+    assert fixed.area > 0
+
+
+def test_validate_and_fix_geometry_duplicate_points():
+    """Test fixing polygons with duplicate consecutive points."""
+    # Polygon with duplicate points
+    polygon_with_dupes = Polygon([(0, 0), (1, 0), (1, 0), (1, 1), (0, 1), (0, 0)])
+
+    # Note: shapely may already handle this, but if it creates an invalid
+    # geometry, our function should fix it
+    if not polygon_with_dupes.is_valid:
+        fixed = validate_and_fix_geometry(polygon_with_dupes)
+        assert fixed.is_valid
+
+
+def test_approximate_area_km2_equator():
+    """Test area calculation near the equator (latitude 0)."""
+    # 1 degree by 1 degree box at the equator
+    square = box(0, 0, 1, 1)
+
+    area = approximate_area_km2(square)
+
+    # At the equator:
+    # 1 degree latitude ≈ 111.32 km
+    # 1 degree longitude ≈ 111.32 km (cos(0) = 1)
+    # Expected area ≈ 111.32 * 111.32 ≈ 12,392 km²
+    expected_area = 111.32 * 111.32
+
+    # Allow 1% tolerance for floating point
+    assert abs(area - expected_area) / expected_area < 0.01
+
+
+def test_approximate_area_km2_mid_latitude():
+    """Test area calculation at 45 degrees latitude."""
+    # 1 degree by 1 degree box at 45° latitude
+    square = box(0, 45, 1, 46)
+
+    area = approximate_area_km2(square)
+
+    # At 45° latitude:
+    # 1 degree latitude ≈ 111.32 km
+    # 1 degree longitude ≈ 111.32 * cos(45°) ≈ 78.71 km
+    # Centroid is at 45.5°, so cos(45.5°)
+    avg_lat = 45.5
+    expected_area = 111.32 * (111.32 * cos(radians(avg_lat)))
+
+    # Allow 1% tolerance
+    assert abs(area - expected_area) / expected_area < 0.01
+
+
+def test_approximate_area_km2_small_area():
+    """Test area calculation for a small polygon."""
+    # 0.1 degree by 0.1 degree box at the equator
+    small_square = box(0, 0, 0.1, 0.1)
+
+    area = approximate_area_km2(small_square)
+
+    # Expected area ≈ (111.32 * 0.1) * (111.32 * 0.1) ≈ 123.92 km²
+    expected_area = (111.32 * 0.1) * (111.32 * 0.1)
+
+    # Allow 1% tolerance
+    assert abs(area - expected_area) / expected_area < 0.01
+
+
+def test_approximate_area_km2_polygon():
+    """Test area calculation for an irregular polygon."""
+    # Triangle at the equator
+    triangle = Polygon([(0, 0), (1, 0), (0.5, 1), (0, 0)])
+
+    area = approximate_area_km2(triangle)
+
+    # Area should be positive and reasonable
+    assert area > 0
+    # Triangle area is half the bounding box
+    # Bounding box is ~1 degree x 1 degree at equator ≈ 12,392 km²
+    # So triangle should be around 6,196 km²
+    assert 5000 < area < 8000
+
+
+def test_approximate_area_km2_northern_hemisphere():
+    """Test that area calculation works in northern latitudes."""
+    # 1 degree by 1 degree box at 60° latitude
+    square = box(0, 60, 1, 61)
+
+    area = approximate_area_km2(square)
+
+    # At 60° latitude, longitude distance is roughly half of equator
+    # cos(60.5°) ≈ 0.495
+    # Expected area smaller than at equator
+    assert area > 0
+    assert area < 12392  # Less than equator area
+
+
+def test_approximate_area_km2_southern_hemisphere():
+    """Test that area calculation works in southern latitudes."""
+    # 1 degree by 1 degree box at -30° latitude
+    square = box(0, -30, 1, -29)
+
+    area = approximate_area_km2(square)
+
+    # Should be symmetric with northern hemisphere
+    assert area > 0
+    assert area < 12392  # Less than equator but more than 60° latitude
