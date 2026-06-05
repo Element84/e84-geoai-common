@@ -75,7 +75,9 @@ class LLMResponseMetadata(BaseModel):
 
     input_tokens: int
     output_tokens: int
-    stop_reason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
+    stop_reason: Literal[
+        "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "refusal"
+    ]
 
 
 class LLMMessage(BaseModel, frozen=True):
