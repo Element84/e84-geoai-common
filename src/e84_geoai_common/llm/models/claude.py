@@ -397,14 +397,11 @@ class BedrockClaudeLLM(LLM):
     def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ClaudeInvokeLLMRequest:
-        stop_sequences = None
+        """Create a ClaudeInvokeLLMRequest from the given messages and inference config."""
         if config.json_mode:
-            # https://docs.aws.amazon.com/nova/latest/userguide/prompting-structured-output.html
-            prefix = "```json\n{"
-            messages = [*messages, LLMMessage(role="assistant", content=prefix)]
-            stop_sequences = ["```"]
-        elif config.response_prefix:
-            messages = [*messages, LLMMessage(role="assistant", content=config.response_prefix)]
+            raise ValueError("JSON mode is not supported for Bedrock Claude.")
+        if config.response_prefix is not None:
+            raise ValueError("Response prefix is not supported for Bedrock Claude.")
 
         tools = None
         tool_choice = None
@@ -438,7 +435,6 @@ class BedrockClaudeLLM(LLM):
             top_p=config.top_p,
             tools=tools,
             tool_choice=tool_choice,
-            stop_sequences=stop_sequences,
             messages=[_llm_message_to_claude_message(msg) for msg in messages],
         )
 
@@ -454,7 +450,7 @@ class BedrockClaudeLLM(LLM):
             raise ValueError("Must specify at least one message.")
         request = self.create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        llm_msg = self._response_to_llm_message(response, inference_cfg=inference_cfg)
+        llm_msg = self._response_to_llm_message(response)
         return llm_msg
 
     @timed_function
@@ -483,20 +479,12 @@ class BedrockClaudeLLM(LLM):
         )
         return claude_response
 
-    def _response_to_llm_message(
-        self, response: ClaudeResponse, inference_cfg: LLMInferenceConfig
-    ) -> LLMAssistantMessage:
+    def _response_to_llm_message(self, response: ClaudeResponse) -> LLMAssistantMessage:
         def _to_llm_content(
-            index: int, c: ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent
+            c: ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent,
         ) -> TextContent | Base64ImageContent | LLMToolUseContent:
             match c:
-                case ClaudeTextContent():
-                    text = c.text
-                    if index == 0:
-                        if inference_cfg.json_mode:
-                            text = "{" + text.removesuffix("```")
-                        elif inference_cfg.response_prefix:
-                            text = inference_cfg.response_prefix + text
+                case ClaudeTextContent(text=text):
                     return TextContent(text=text)
                 case ClaudeImageContent():
                     return Base64ImageContent(media_type=c.source.media_type, data=c.source.data)
@@ -504,7 +492,7 @@ class BedrockClaudeLLM(LLM):
                     return LLMToolUseContent(id=c.id, name=c.name, input=c.input)
 
         return LLMAssistantMessage(
-            content=[_to_llm_content(i, c) for i, c in enumerate(response.content)],
+            content=[_to_llm_content(c) for c in response.content],
             metadata=LLMResponseMetadata(
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
