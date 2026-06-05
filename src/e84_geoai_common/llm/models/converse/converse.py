@@ -34,6 +34,7 @@ from e84_geoai_common.llm.models.claude import (
     CLAUDE_3_HAIKU,
     CLAUDE_3_OPUS,
     CLAUDE_3_SONNET,
+    CLAUDE_4_5_HAIKU,
     CLAUDE_4_SONNET,
     CLAUDE_INSTANT,
 )
@@ -259,14 +260,12 @@ class BedrockConverseLLM(LLM):
     client: BedrockRuntimeClient
 
     def __init__(
-        self,
-        model_id: str = CONVERSE_BEDROCK_MODEL_IDS["Claude 3 Haiku"],
-        client: BedrockRuntimeClient | None = None,
+        self, model_id: str = CLAUDE_4_5_HAIKU, client: BedrockRuntimeClient | None = None
     ) -> None:
         """Initialize.
 
         Args:
-            model_id: Model ID. Defaults to the model ID for Claude 3 Haiku.
+            model_id: Model ID. Defaults to the model ID for Claude 4.5 Haiku.
             client: Optional pre-initialized boto3 client. Defaults to None.
         """
         self.model_id = model_id

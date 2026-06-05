@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 import base64
 import json
 from contextlib import nullcontext as does_not_raise
@@ -29,6 +31,7 @@ from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     converse_response_with_content,
     make_test_bedrock_runtime_client,
 )
+from tests.llm.models.utils import build_long_system_prompt
 
 
 def test_basic_usage() -> None:
@@ -48,16 +51,20 @@ def test_basic_usage() -> None:
 
 def test_with_response_prefix() -> None:
     llm = BedrockConverseLLM(
-        client=make_test_bedrock_runtime_client([converse_response_with_content("  15")])
+        client=make_test_bedrock_runtime_client([converse_response_with_content("15")])
     )
-    config = LLMInferenceConfig(response_prefix="5 + 10 =")
+    config = LLMInferenceConfig(response_prefix="5+10=")
     resp = llm.prompt(
-        [LLMUserMessage(content="Output the sum of 5 and 10 without additional explanation")],
+        [
+            LLMUserMessage(
+                content="Output the sum of 5 and 10 and only that without any extraneous characters."
+            )
+        ],
         config,
     )
     assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
         "role": "assistant",
-        "content": [{"text": "5 + 10 =  15"}],
+        "content": [{"text": "5+10=15"}],
         "metadata": {"stop_reason": "end_turn"},
     }
 
@@ -340,40 +347,38 @@ def test_large_system_prompt() -> None:
 
     It uses a large system prompt so that the minimum token limit is reached.
     """
-    long_system_prompt_path = Path(__file__).parent / "long_system_prompt.txt"
-    with long_system_prompt_path.open(encoding="utf-8") as file:
-        system_prompt = file.read()
+    long_system_prompt = build_long_system_prompt()
 
-        text_content = TextContent(text="Output the word hello backwards and only that.")
-        llm = BedrockConverseLLM(
-            model_id=CONVERSE_BEDROCK_MODEL_IDS["Nova Pro"],
-            client=make_test_bedrock_runtime_client(
-                [
-                    converse_response_with_content(
-                        "olleh",
-                        {
-                            "usage": {
-                                "inputTokens": 123,
-                                "outputTokens": 123,
-                                "totalTokens": 444,
-                                "cacheReadInputTokens": 0,
-                                "cacheWriteInputTokens": 2500,
-                            }
-                        },
-                    )
-                ]
-            ),
-        )
-        config = LLMInferenceConfig(system_prompt=system_prompt)
-        request = llm.create_request(
-            [LLMUserMessage(content=[text_content, CachePointContent()])], config
-        )
-        response = llm.invoke_model_with_request(request)
+    text_content = TextContent(text="Output the word hello backwards and only that.")
+    llm = BedrockConverseLLM(
+        model_id=CONVERSE_BEDROCK_MODEL_IDS["Nova Pro"],
+        client=make_test_bedrock_runtime_client(
+            [
+                converse_response_with_content(
+                    "olleh",
+                    {
+                        "usage": {
+                            "inputTokens": 123,
+                            "outputTokens": 123,
+                            "totalTokens": 444,
+                            "cacheReadInputTokens": 0,
+                            "cacheWriteInputTokens": 2500,
+                        }
+                    },
+                )
+            ]
+        ),
+    )
+    config = LLMInferenceConfig(system_prompt=long_system_prompt)
+    request = llm.create_request(
+        [LLMUserMessage(content=[text_content, CachePointContent()])], config
+    )
+    response = llm.invoke_model_with_request(request)
 
-        assert response.output == ConverseMessageResponse(
-            message=ConverseAssistantMessage(
-                role="assistant", content=[ConverseTextContent(text="olleh")]
-            )
+    assert response.output == ConverseMessageResponse(
+        message=ConverseAssistantMessage(
+            role="assistant", content=[ConverseTextContent(text="olleh")]
         )
-        assert response.usage.cacheWriteInputTokens is not None
-        assert response.usage.cacheWriteInputTokens > 0
+    )
+    assert response.usage.cacheWriteInputTokens is not None
+    assert response.usage.cacheWriteInputTokens > 0

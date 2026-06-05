@@ -21,6 +21,7 @@ from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     make_test_bedrock_runtime_client,
     nova_response_with_content,
 )
+from tests.llm.models.utils import build_long_system_prompt
 
 
 def test_basic_usage() -> None:
@@ -162,26 +163,24 @@ def test_large_system_prompt() -> None:
 
     It uses a large system prompt so that the minimum token limit is reached.
     """
-    long_system_prompt_path = Path(__file__).parent / "long_system_prompt.txt"
-    with long_system_prompt_path.open(encoding="utf-8") as file:
-        system_prompt = file.read()
+    long_system_prompt = build_long_system_prompt()
 
-        text_content = TextContent(text="Output the word hello backwards and only that.")
-        llm = BedrockNovaLLM(
-            client=make_test_bedrock_runtime_client([nova_response_with_content("olleh")]),
-        )
-        config = LLMInferenceConfig(system_prompt=system_prompt)
-        request = llm.create_request(
-            [LLMUserMessage(content=[text_content, CachePointContent()])], config
-        )
-        response = llm.invoke_model_with_request(request)
+    text_content = TextContent(text="Output the word hello backwards and only that.")
+    llm = BedrockNovaLLM(
+        client=make_test_bedrock_runtime_client([nova_response_with_content("olleh")]),
+    )
+    config = LLMInferenceConfig(system_prompt=long_system_prompt)
+    request = llm.create_request(
+        [LLMUserMessage(content=[text_content, CachePointContent()])], config
+    )
+    response = llm.invoke_model_with_request(request)
 
-        assert response.output == NovaResponseOutput(
-            message=NovaMessage(
-                role="assistant",
-                content=[NovaTextContent(text="olleh", cache_point=None)],
-            )
+    assert response.output == NovaResponseOutput(
+        message=NovaMessage(
+            role="assistant",
+            content=[NovaTextContent(text="olleh", cachePoint=None)],
         )
+    )
 
-        assert response.usage.cache_write_input_token_count is not None
-        assert response.usage.cache_write_input_token_count > 0
+    assert response.usage.cache_write_input_token_count is not None
+    assert response.usage.cache_write_input_token_count > 0
