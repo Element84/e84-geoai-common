@@ -1,6 +1,6 @@
 import logging
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from e84_geoai_common.llm.core import (
     LLM,
@@ -67,13 +67,23 @@ def extract_data_from_text[Model: BaseModel](
         Model: The extracted data model validated against the specified model
             type.
     """
+    input_schema = model_type.model_json_schema()
+    is_wrapped_model = False
+    if "anyOf" in input_schema:
+        # Unions are not allowed at the root level of the schema, so we wrap the model in an outer
+        # model
+        input_model = create_model("DataModelWrapper", data=(model_type, ...))
+        is_wrapped_model = True
+    else:
+        input_model = model_type
+
     inference_cfg = LLMInferenceConfig(
         system_prompt=system_prompt,
         tools=[
             LLMTool(
                 name="parse_data",
                 description="Parse the user input into the specified data structure.",
-                input_model=model_type,
+                input_model=input_model,
                 output_model=None,
             ),
         ],
@@ -84,6 +94,8 @@ def extract_data_from_text[Model: BaseModel](
     try:
         for content in resp.content:
             if isinstance(content, LLMToolUseContent) and content.name == "parse_data":
+                if is_wrapped_model:
+                    return model_type.model_validate(content.input["data"])
                 return model_type.model_validate(content.input)
     except (ValidationError, TypeError) as e:
         log.exception("Unable to parse LLM response: %s", resp)

@@ -348,6 +348,15 @@ def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
         input_schema = cast("dict[str, Any]", {"type": "object", "properties": {}})
     else:
         input_schema = tool.input_model.model_json_schema()
+        if "type" not in input_schema or any(
+            k in input_schema for k in ("oneOf", "anyOf", "allOf")
+        ):
+            raise ValueError(
+                "Tool input models must be JSON objects (i.e. model_json_schema must have "
+                '"type": "object") and must not use oneOf/anyOf/allOf at the root. '
+                "This usually happens when input_model is a union type. Consider using a custom "
+                "root model with a single field if you want to use a Union."
+            )
 
     description = tool.description
     if tool.output_model is not None:
