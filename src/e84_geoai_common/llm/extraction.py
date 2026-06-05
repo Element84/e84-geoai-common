@@ -2,9 +2,20 @@ import logging
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from e84_geoai_common.llm.core import LLM, LLMInferenceConfig, LLMMessage
+from e84_geoai_common.llm.core import (
+    LLM,
+    LLMInferenceConfig,
+    LLMMessage,
+    LLMTool,
+    LLMToolChoice,
+    LLMToolUseContent,
+)
 
 log = logging.getLogger(__name__)
+
+
+class ExtractionError(Exception):
+    """Custom exception for errors during data extraction from LLM responses."""
 
 
 class ExtractDataExample[Model: BaseModel](BaseModel):
@@ -34,6 +45,7 @@ class ExtractDataExample[Model: BaseModel](BaseModel):
         return f'Example: {self.name}\nUser Query: "{self.user_query}"\n\n{query_json}'
 
 
+# FUTURE: use built-in structured output support if available
 def extract_data_from_text[Model: BaseModel](
     *,
     llm: LLM,
@@ -57,13 +69,24 @@ def extract_data_from_text[Model: BaseModel](
     """
     inference_cfg = LLMInferenceConfig(
         system_prompt=system_prompt,
-        json_mode=True,
+        tools=[
+            LLMTool(
+                name="parse_data",
+                description="Parse the user input into the specified data structure.",
+                input_model=model_type,
+                output_model=None,
+            ),
+        ],
+        tool_choice=LLMToolChoice(mode="force_specific_tool_use", tool_name="parse_data"),
     )
     messages = [LLMMessage(role="user", content=user_prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=inference_cfg)
     try:
-        out = model_type.model_validate_json(resp.to_text_only())
-    except (ValidationError, TypeError):
+        for content in resp.content:
+            if isinstance(content, LLMToolUseContent) and content.name == "parse_data":
+                return model_type.model_validate(content.input)
+    except (ValidationError, TypeError) as e:
         log.exception("Unable to parse LLM response: %s", resp)
-        raise
-    return out
+        raise ExtractionError(f"Unable to parse LLM response: {resp}") from e
+
+    raise ExtractionError(f"LLM response did not contain tool use content: {resp}")
