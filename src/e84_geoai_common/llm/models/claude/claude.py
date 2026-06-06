@@ -1,9 +1,10 @@
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from itertools import pairwise
 from typing import Any, Literal, cast
 
+import aioboto3
 import boto3
 import botocore.config
 import botocore.exceptions
@@ -568,3 +569,59 @@ class BedrockClaudeLLM(LLM):
                 stop_reason=response.stop_reason,
             ),
         )
+
+    async def prompt_stream(
+        self,
+        messages: Sequence[LLMMessage],
+        inference_cfg: LLMInferenceConfig,
+    ) -> AsyncIterator["ClaudeStreamEvent"]:
+        """Stream a response from the LLM using invoke_model_with_response_stream.
+
+        Yields typed ClaudeStreamEvent objects as they arrive. Uses aioboto3 for
+        native async I/O.
+
+        Args:
+            messages: The messages to send to the LLM.
+            inference_cfg: Inference configuration.
+
+        Yields:
+            ClaudeStreamEvent: Typed streaming events (message_start,
+                content_block_start, content_block_delta, content_block_stop,
+                message_delta, message_stop). Ping events are skipped.
+
+        Raises:
+            ValueError: If no messages are provided.
+            ClaudeStreamError: If a stream error event is received.
+        """
+        from e84_geoai_common.llm.models.claude.streaming import (
+            ClaudeStreamEvent,
+            parse_stream_event,
+        )
+
+        if len(messages) == 0:
+            raise ValueError("Must specify at least one message.")
+
+        request = self.create_request(messages, inference_cfg)
+        request_body = request.model_dump_json(exclude_none=True, by_alias=True)
+
+        session = aioboto3.Session()
+        async with session.client(
+            "bedrock-runtime",
+            region_name=self.client.meta.region_name,
+            config=botocore.config.Config(read_timeout=300),
+        ) as async_client:
+            response = await async_client.invoke_model_with_response_stream(  # type: ignore[reportUnknownMemberType]
+                modelId=self.model_id,
+                contentType="application/json",
+                body=request_body,
+            )
+
+            async for event in response["body"]:  # type: ignore[reportUnknownMemberType]
+                chunk = event.get("chunk")  # type: ignore[reportUnknownMemberType]
+                if chunk is None:
+                    continue
+                chunk_bytes: bytes = chunk["bytes"]  # type: ignore[reportUnknownMemberType]
+                data: dict[str, Any] = json.loads(chunk_bytes)
+                parsed = parse_stream_event(data)
+                if parsed is not None:
+                    yield parsed
