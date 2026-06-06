@@ -19,7 +19,9 @@ dependencies = [
   "types-shapely>=2.0.0.20240820",
   "function_schema>=0.4.4",
   "rich",
-  "mypy-boto3-bedrock-runtime>=1.37.0"]
+  "mypy-boto3-bedrock-runtime>=1.37.0",
+  "aioboto3>=13.0.0",
+]
 dynamic = ["version"]
 
 [tool.setuptools-git-versioning]
@@ -38,6 +40,7 @@ Github = "https://github.com/Element84/e84-geoai-common"
 debugging = ["folium>=0.17.0"]
 dev = [
   "pytest>=8.3.3",
+  "pytest-asyncio>=0.23.0",
   "pytest-watch",
   "ipykernel>=6.29.5",
   "ruff>=0.6.8",
@@ -45,10 +48,10 @@ dev = [
   "build>=1.2.2",
   "pre-commit>=3.8.0",
   "pre-commit-hooks>=4.6.0",
-  "moto[s3]>=5.0.0"]
-tracing = [
-  "langfuse>=3.6.1",
+  "moto[s3]>=5.0.0",
+  "types-aiobotocore-bedrock-runtime>=2.15.0",
 ]
+tracing = ["langfuse>=3.6.1"]
 
 
 [tool.pyright]
@@ -102,14 +105,16 @@ ignore = [
   # TO DO comment missing linked issue
   'TD003',
   # TO DO missing colon
-  'TD004']
+  'TD004',
+]
 
 [tool.ruff.lint.per-file-ignores]
 '__init__.py' = [
   # Module level import not at top of cell
   'E402',
   # Imported but unused
-  'F401']
+  'F401',
+]
 'tests/**/*' = [
   # Use of assert detected
   'S101',
@@ -122,4 +127,5 @@ ignore = [
   # magic values
   'PLR2004',
   #unused parameters
-  'ARG001']
+  'ARG001',
+]
