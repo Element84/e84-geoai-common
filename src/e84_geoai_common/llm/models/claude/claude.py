@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Sequence
 from itertools import pairwise
 from typing import Any, Literal, cast
 
-import aioboto3
+import aioboto3  # type: ignore[reportMissingImports]
 import boto3
 import botocore.config
 import botocore.exceptions
@@ -26,6 +26,10 @@ from e84_geoai_common.llm.core.llm import (
     LLMToolResultContent,
     LLMToolUseContent,
     TextContent,
+)
+from e84_geoai_common.llm.models.claude.streaming import (
+    ClaudeStreamEvent,
+    parse_stream_event,
 )
 from e84_geoai_common.tracing import observe, timed_function, update_current_generation
 
@@ -578,7 +582,7 @@ class BedrockClaudeLLM(LLM):
         self,
         messages: Sequence[LLMMessage],
         inference_cfg: LLMInferenceConfig,
-    ) -> AsyncIterator["ClaudeStreamEvent"]:
+    ) -> AsyncIterator[ClaudeStreamEvent]:
         """Stream a response from the LLM using invoke_model_with_response_stream.
 
         Yields typed ClaudeStreamEvent objects as they arrive. Uses aioboto3 for
@@ -597,11 +601,6 @@ class BedrockClaudeLLM(LLM):
             ValueError: If no messages are provided.
             ClaudeStreamError: If a stream error event is received.
         """
-        from e84_geoai_common.llm.models.claude.streaming import (
-            ClaudeStreamEvent,
-            parse_stream_event,
-        )
-
         if len(messages) == 0:
             raise ValueError("Must specify at least one message.")
 
@@ -609,12 +608,12 @@ class BedrockClaudeLLM(LLM):
         request_body = request.model_dump_json(exclude_none=True, by_alias=True)
 
         region_name = self._region_name or self.client.meta.region_name
-        session = aioboto3.Session()
-        async with session.client(
+        session = aioboto3.Session()  # type: ignore[reportUnknownMemberType]
+        async with session.client(  # type: ignore[reportUnknownMemberType]
             "bedrock-runtime",
             region_name=region_name,
             config=botocore.config.Config(read_timeout=300),
-        ) as async_client:
+        ) as async_client:  # type: ignore[reportUnknownVariableType]
             response = await async_client.invoke_model_with_response_stream(  # type: ignore[reportUnknownMemberType]
                 modelId=self.model_id,
                 contentType="application/json",
@@ -626,7 +625,7 @@ class BedrockClaudeLLM(LLM):
                 if chunk is None:
                     continue
                 chunk_bytes: bytes = chunk["bytes"]  # type: ignore[reportUnknownMemberType]
-                data: dict[str, Any] = json.loads(chunk_bytes)
+                data: dict[str, Any] = json.loads(chunk_bytes)  # type: ignore[reportUnknownArgumentType]
                 parsed = parse_stream_event(data)
                 if parsed is not None:
                     yield parsed

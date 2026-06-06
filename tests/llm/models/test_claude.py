@@ -1,6 +1,8 @@
 import base64
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
+import pytest
 from pydantic import BaseModel, Field
 from rich import print as rich_print
 
@@ -21,9 +23,24 @@ from e84_geoai_common.llm.models.claude import (
     BedrockClaudeLLM,
     ClaudeTextContent,
 )
+from e84_geoai_common.llm.models.claude.streaming import (
+    ClaudeInputJsonDelta,
+    ClaudeStreamContentBlockDelta,
+    ClaudeStreamContentBlockStart,
+    ClaudeStreamContentBlockStop,
+    ClaudeStreamMessageDelta,
+    ClaudeStreamMessageStart,
+    ClaudeStreamMessageStop,
+    ClaudeStreamTextBlock,
+    ClaudeStreamToolUseBlock,
+    ClaudeTextDelta,
+)
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
+    MockAsyncEventStream,
     _MockBedrockRuntimeClient,  # type: ignore[reportPrivateUsage]
     claude_response_with_content,
+    claude_streaming_events_for_text,
+    claude_streaming_events_for_tool_use,
     make_test_bedrock_runtime_client,
 )
 from tests.llm.models.utils import build_long_system_prompt
@@ -302,28 +319,6 @@ def test_large_system_prompt() -> None:
 # Streaming tests
 # =============================================================================
 
-import pytest
-
-from unittest.mock import AsyncMock, patch
-
-from e84_geoai_common.llm.models.claude.streaming import (
-    ClaudeInputJsonDelta,
-    ClaudeStreamContentBlockDelta,
-    ClaudeStreamContentBlockStart,
-    ClaudeStreamContentBlockStop,
-    ClaudeStreamMessageDelta,
-    ClaudeStreamMessageStart,
-    ClaudeStreamMessageStop,
-    ClaudeStreamTextBlock,
-    ClaudeStreamToolUseBlock,
-    ClaudeTextDelta,
-)
-from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
-    MockAsyncEventStream,
-    claude_streaming_events_for_text,
-    claude_streaming_events_for_tool_use,
-)
-
 
 @pytest.mark.asyncio
 async def test_prompt_stream_text() -> None:
@@ -346,11 +341,12 @@ async def test_prompt_stream_text() -> None:
         mock_session = mock_aioboto3.Session.return_value
         mock_session.client.return_value = mock_client_cm
 
-        collected = []
-        async for event in llm.prompt_stream(
-            [LLMUserMessage(content="Hello")], LLMInferenceConfig()
-        ):
-            collected.append(event)
+        collected = [
+            event
+            async for event in llm.prompt_stream(
+                [LLMUserMessage(content="Hello")], LLMInferenceConfig()
+            )
+        ]
 
     # Verify event sequence (ping should be skipped)
     assert len(collected) == 6
@@ -402,21 +398,22 @@ async def test_prompt_stream_tool_use() -> None:
         mock_session = mock_aioboto3.Session.return_value
         mock_session.client.return_value = mock_client_cm
 
-        collected = []
-        async for event in llm.prompt_stream(
-            [LLMUserMessage(content="What's the weather?")],
-            LLMInferenceConfig(
-                tools=[
-                    LLMTool(
-                        name="get_weather",
-                        description="Get weather",
-                        input_model=None,
-                        output_model=None,
-                    )
-                ]
-            ),
-        ):
-            collected.append(event)
+        collected = [
+            event
+            async for event in llm.prompt_stream(
+                [LLMUserMessage(content="What's the weather?")],
+                LLMInferenceConfig(
+                    tools=[
+                        LLMTool(
+                            name="get_weather",
+                            description="Get weather",
+                            input_model=None,
+                            output_model=None,
+                        )
+                    ]
+                ),
+            )
+        ]
 
     # Verify event sequence (2 input_json_delta events due to chunking)
     assert len(collected) == 7
@@ -479,11 +476,12 @@ async def test_prompt_stream_skips_ping() -> None:
         mock_session = mock_aioboto3.Session.return_value
         mock_session.client.return_value = mock_client_cm
 
-        collected = []
-        async for event in llm.prompt_stream(
-            [LLMUserMessage(content="Hi")], LLMInferenceConfig()
-        ):
-            collected.append(event)
+        collected = [
+            event
+            async for event in llm.prompt_stream(
+                [LLMUserMessage(content="Hi")], LLMInferenceConfig()
+            )
+        ]
 
     # Pings should be skipped, only message_start and message_stop remain
     assert len(collected) == 2

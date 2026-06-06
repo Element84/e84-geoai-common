@@ -13,8 +13,8 @@ from e84_geoai_common.llm.models.claude import (
     CLAUDE_INSTANT,
     BedrockClaudeLLM,
     ClaudeInvokeLLMRequest,
-    ClaudeStreamEvent,
     ClaudeStreamError,
+    ClaudeStreamEvent,
 )
 from e84_geoai_common.llm.models.converse import (
     CONVERSE_BEDROCK_MODEL_IDS,

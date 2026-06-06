@@ -8,7 +8,6 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # =============================================================================
 # Delta types (content within content_block_delta events)
 # =============================================================================
@@ -206,6 +205,16 @@ class ClaudeStreamError(Exception):
         super().__init__(f"Stream error: {error_data}")
 
 
+_EVENT_TYPE_MAP: dict[str, type[BaseModel]] = {
+    "message_start": ClaudeStreamMessageStart,
+    "content_block_start": ClaudeStreamContentBlockStart,
+    "content_block_delta": ClaudeStreamContentBlockDelta,
+    "content_block_stop": ClaudeStreamContentBlockStop,
+    "message_delta": ClaudeStreamMessageDelta,
+    "message_stop": ClaudeStreamMessageStop,
+}
+
+
 def parse_stream_event(data: dict[str, Any]) -> ClaudeStreamEvent | None:
     """Parse a raw streaming event dict into a typed ClaudeStreamEvent.
 
@@ -227,18 +236,8 @@ def parse_stream_event(data: dict[str, Any]) -> ClaudeStreamEvent | None:
     if event_type == "error":
         raise ClaudeStreamError(data.get("error", data))
 
-    match event_type:
-        case "message_start":
-            return ClaudeStreamMessageStart.model_validate(data)
-        case "content_block_start":
-            return ClaudeStreamContentBlockStart.model_validate(data)
-        case "content_block_delta":
-            return ClaudeStreamContentBlockDelta.model_validate(data)
-        case "content_block_stop":
-            return ClaudeStreamContentBlockStop.model_validate(data)
-        case "message_delta":
-            return ClaudeStreamMessageDelta.model_validate(data)
-        case "message_stop":
-            return ClaudeStreamMessageStop.model_validate(data)
-        case _:
-            raise ValueError(f"Unrecognized stream event type: {event_type!r}")
+    model_cls = _EVENT_TYPE_MAP.get(event_type)  # type: ignore[arg-type]
+    if model_cls is None:
+        raise ValueError(f"Unrecognized stream event type: {event_type!r}")
+
+    return model_cls.model_validate(data)  # type: ignore[return-value]
