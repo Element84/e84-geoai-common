@@ -464,7 +464,7 @@ class BedrockClaudeLLM(LLM):
 
             if _supports_caching(self.model_id) and config.cache_tools:
                 # If the model supports caching we'll cache all of the tool definitions by default.
-                # Everyt tool before the last tool will be included in this cache.
+                # Every tool before the last tool will be included in this cache.
                 last_tool = tools[-1]
                 last_tool.cache_control = ClaudeCacheControl()
 
@@ -480,6 +480,12 @@ class BedrockClaudeLLM(LLM):
                 ClaudeTextContent(cache_control=cache_control, text=config.system_prompt)
             ]
 
+        output_config = None
+        if config.structured_output_model is not None:
+            output_config = ClaudeOutputConfig(
+                format=JSONSchemaFormat(schema=config.structured_output_model.model_json_schema())
+            )
+
         return ClaudeInvokeLLMRequest(
             max_tokens=config.max_tokens,
             system=system_content,
@@ -489,6 +495,7 @@ class BedrockClaudeLLM(LLM):
             tools=tools,
             tool_choice=tool_choice,
             messages=[_llm_message_to_claude_message(msg) for msg in messages],
+            output_config=output_config,
         )
 
     @timed_function

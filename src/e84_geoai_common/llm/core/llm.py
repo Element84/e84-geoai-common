@@ -261,6 +261,9 @@ class LLMInferenceConfig(BaseModel):
         description="Whether the model should use a specific "
         "tool, or any tool, or decide by itself.",
     )
+    structured_output_model: type[BaseModel] | None = Field(
+        default=None, description="A Pydantic model for structured output."
+    )
 
     @model_validator(mode="after")
     def _disallow_tools_with_json_mode(self) -> Self:
