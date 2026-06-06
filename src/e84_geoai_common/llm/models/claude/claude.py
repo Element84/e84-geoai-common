@@ -435,18 +435,22 @@ class BedrockClaudeLLM(LLM):
         self,
         model_id: str = CLAUDE_4_5_HAIKU,
         client: BedrockRuntimeClient | None = None,
+        region_name: str | None = None,
     ) -> None:
         """Initialize.
 
         Args:
             model_id: Model ID. Defaults to the model ID for Claude 4.5 Haiku.
             client: Optional pre-initialized boto3 client. Defaults to None.
+            region_name: AWS region name. Used for the async streaming client.
+                If not provided, uses the region from the sync client.
         """
         self.model_id = model_id
         self.client = client or boto3.client(  # type: ignore[reportUnknownMemberType]
             "bedrock-runtime",
             config=botocore.config.Config(read_timeout=300),
         )
+        self._region_name = region_name
 
     def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
@@ -604,10 +608,11 @@ class BedrockClaudeLLM(LLM):
         request = self.create_request(messages, inference_cfg)
         request_body = request.model_dump_json(exclude_none=True, by_alias=True)
 
+        region_name = self._region_name or self.client.meta.region_name
         session = aioboto3.Session()
         async with session.client(
             "bedrock-runtime",
-            region_name=self.client.meta.region_name,
+            region_name=region_name,
             config=botocore.config.Config(read_timeout=300),
         ) as async_client:
             response = await async_client.invoke_model_with_response_stream(  # type: ignore[reportUnknownMemberType]

@@ -296,3 +296,196 @@ def test_large_system_prompt() -> None:
     assert response.content == [ClaudeTextContent(text="olleh")]
     assert response.usage.cache_creation_input_tokens is not None
     assert response.usage.cache_creation_input_tokens > 0
+
+
+# =============================================================================
+# Streaming tests
+# =============================================================================
+
+import pytest
+
+from unittest.mock import AsyncMock, patch
+
+from e84_geoai_common.llm.models.claude.streaming import (
+    ClaudeInputJsonDelta,
+    ClaudeStreamContentBlockDelta,
+    ClaudeStreamContentBlockStart,
+    ClaudeStreamContentBlockStop,
+    ClaudeStreamMessageDelta,
+    ClaudeStreamMessageStart,
+    ClaudeStreamMessageStop,
+    ClaudeStreamTextBlock,
+    ClaudeStreamToolUseBlock,
+    ClaudeTextDelta,
+)
+from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
+    MockAsyncEventStream,
+    claude_streaming_events_for_text,
+    claude_streaming_events_for_tool_use,
+)
+
+
+@pytest.mark.asyncio
+async def test_prompt_stream_text() -> None:
+    """Test that prompt_stream yields the correct typed events for a text response."""
+    events = claude_streaming_events_for_text("Hello, world!")
+    mock_event_stream = MockAsyncEventStream(events)
+
+    mock_response = {"body": mock_event_stream}
+    mock_client_cm = AsyncMock()
+    mock_client_cm.__aenter__ = AsyncMock(return_value=mock_client_cm)
+    mock_client_cm.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cm.invoke_model_with_response_stream = AsyncMock(return_value=mock_response)
+
+    llm = BedrockClaudeLLM(
+        client=make_test_bedrock_runtime_client([claude_response_with_content("unused")]),
+        region_name="us-east-1",
+    )
+
+    with patch("e84_geoai_common.llm.models.claude.claude.aioboto3") as mock_aioboto3:
+        mock_session = mock_aioboto3.Session.return_value
+        mock_session.client.return_value = mock_client_cm
+
+        collected = []
+        async for event in llm.prompt_stream(
+            [LLMUserMessage(content="Hello")], LLMInferenceConfig()
+        ):
+            collected.append(event)
+
+    # Verify event sequence (ping should be skipped)
+    assert len(collected) == 6
+    assert isinstance(collected[0], ClaudeStreamMessageStart)
+    assert collected[0].message.id == "msg_stream_123"
+    assert collected[0].message.model == "claude-3-haiku-20240307"
+
+    assert isinstance(collected[1], ClaudeStreamContentBlockStart)
+    assert collected[1].index == 0
+    assert isinstance(collected[1].content_block, ClaudeStreamTextBlock)
+
+    assert isinstance(collected[2], ClaudeStreamContentBlockDelta)
+    assert collected[2].index == 0
+    assert isinstance(collected[2].delta, ClaudeTextDelta)
+    assert collected[2].delta.text == "Hello, world!"
+
+    assert isinstance(collected[3], ClaudeStreamContentBlockStop)
+    assert collected[3].index == 0
+
+    assert isinstance(collected[4], ClaudeStreamMessageDelta)
+    assert collected[4].delta.stop_reason == "end_turn"
+    assert collected[4].usage.output_tokens == 15
+
+    assert isinstance(collected[5], ClaudeStreamMessageStop)
+
+
+@pytest.mark.asyncio
+async def test_prompt_stream_tool_use() -> None:
+    """Test that prompt_stream yields correct typed events for tool use."""
+    events = claude_streaming_events_for_tool_use(
+        tool_name="get_weather",
+        tool_id="toolu_abc123",
+        input_json='{"location": "San Francisco, CA"}',
+    )
+    mock_event_stream = MockAsyncEventStream(events)
+
+    mock_response = {"body": mock_event_stream}
+    mock_client_cm = AsyncMock()
+    mock_client_cm.__aenter__ = AsyncMock(return_value=mock_client_cm)
+    mock_client_cm.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cm.invoke_model_with_response_stream = AsyncMock(return_value=mock_response)
+
+    llm = BedrockClaudeLLM(
+        client=make_test_bedrock_runtime_client([claude_response_with_content("unused")]),
+        region_name="us-east-1",
+    )
+
+    with patch("e84_geoai_common.llm.models.claude.claude.aioboto3") as mock_aioboto3:
+        mock_session = mock_aioboto3.Session.return_value
+        mock_session.client.return_value = mock_client_cm
+
+        collected = []
+        async for event in llm.prompt_stream(
+            [LLMUserMessage(content="What's the weather?")],
+            LLMInferenceConfig(
+                tools=[
+                    LLMTool(
+                        name="get_weather",
+                        description="Get weather",
+                        input_model=None,
+                        output_model=None,
+                    )
+                ]
+            ),
+        ):
+            collected.append(event)
+
+    # Verify event sequence (2 input_json_delta events due to chunking)
+    assert len(collected) == 7
+    assert isinstance(collected[0], ClaudeStreamMessageStart)
+
+    assert isinstance(collected[1], ClaudeStreamContentBlockStart)
+    assert isinstance(collected[1].content_block, ClaudeStreamToolUseBlock)
+    assert collected[1].content_block.name == "get_weather"
+    assert collected[1].content_block.id == "toolu_abc123"
+
+    # Two input_json_delta events
+    assert isinstance(collected[2], ClaudeStreamContentBlockDelta)
+    assert isinstance(collected[2].delta, ClaudeInputJsonDelta)
+    assert isinstance(collected[3], ClaudeStreamContentBlockDelta)
+    assert isinstance(collected[3].delta, ClaudeInputJsonDelta)
+
+    assert isinstance(collected[4], ClaudeStreamContentBlockStop)
+
+    assert isinstance(collected[5], ClaudeStreamMessageDelta)
+    assert collected[5].delta.stop_reason == "tool_use"
+
+    assert isinstance(collected[6], ClaudeStreamMessageStop)
+
+
+@pytest.mark.asyncio
+async def test_prompt_stream_skips_ping() -> None:
+    """Test that ping events are silently skipped."""
+    # Only ping + message_stop
+    events = [
+        {"type": "ping"},
+        {"type": "ping"},
+        {
+            "type": "message_start",
+            "message": {
+                "id": "msg_ping_test",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-3-haiku-20240307",
+                "stop_reason": None,
+                "stop_sequence": None,
+                "usage": {"input_tokens": 10, "output_tokens": 1},
+            },
+        },
+        {"type": "message_stop"},
+    ]
+    mock_event_stream = MockAsyncEventStream(events)
+
+    mock_response = {"body": mock_event_stream}
+    mock_client_cm = AsyncMock()
+    mock_client_cm.__aenter__ = AsyncMock(return_value=mock_client_cm)
+    mock_client_cm.__aexit__ = AsyncMock(return_value=False)
+    mock_client_cm.invoke_model_with_response_stream = AsyncMock(return_value=mock_response)
+
+    llm = BedrockClaudeLLM(
+        client=make_test_bedrock_runtime_client([claude_response_with_content("unused")]),
+        region_name="us-east-1",
+    )
+
+    with patch("e84_geoai_common.llm.models.claude.claude.aioboto3") as mock_aioboto3:
+        mock_session = mock_aioboto3.Session.return_value
+        mock_session.client.return_value = mock_client_cm
+
+        collected = []
+        async for event in llm.prompt_stream(
+            [LLMUserMessage(content="Hi")], LLMInferenceConfig()
+        ):
+            collected.append(event)
+
+    # Pings should be skipped, only message_start and message_stop remain
+    assert len(collected) == 2
+    assert isinstance(collected[0], ClaudeStreamMessageStart)
+    assert isinstance(collected[1], ClaudeStreamMessageStop)
