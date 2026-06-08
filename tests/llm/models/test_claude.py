@@ -1,8 +1,5 @@
 import base64
-import json
-from contextlib import nullcontext as does_not_raise
 from pathlib import Path
-from textwrap import dedent
 
 from pydantic import BaseModel, Field
 from rich import print as rich_print
@@ -20,7 +17,7 @@ from e84_geoai_common.llm.core.llm import (
     TextContent,
 )
 from e84_geoai_common.llm.models.claude import (
-    CLAUDE_BEDROCK_MODEL_IDS,
+    CLAUDE_4_5_HAIKU,
     BedrockClaudeLLM,
     ClaudeTextContent,
 )
@@ -29,6 +26,7 @@ from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     claude_response_with_content,
     make_test_bedrock_runtime_client,
 )
+from tests.llm.models.utils import build_long_system_prompt
 
 
 def test_basic_usage() -> None:
@@ -44,72 +42,6 @@ def test_basic_usage() -> None:
         "content": [{"text": "olleh"}],
         "metadata": {"stop_reason": "end_turn"},
     }
-
-
-def test_with_response_prefix() -> None:
-    llm = BedrockClaudeLLM(
-        client=make_test_bedrock_runtime_client([claude_response_with_content("  15")])
-    )
-    config = LLMInferenceConfig(response_prefix="5 + 10 =")
-    resp = llm.prompt(
-        [LLMUserMessage(content="Output the sum of 5 and 10 without additional explanation")],
-        config,
-    )
-    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
-        "role": "assistant",
-        "content": [{"text": "5 + 10 =  15"}],
-        "metadata": {"stop_reason": "end_turn"},
-    }
-
-
-def test_json_mode() -> None:
-    json_mode_prompt = dedent("""
-        Create a list of the numbers 1 through 5.
-
-        Here's an example of the desired output for the number 2 through 6
-        {"result": [2, 3, 4, 5, 6]}
-    """)
-    llm = BedrockClaudeLLM(
-        client=make_test_bedrock_runtime_client(
-            [claude_response_with_content('"result": [1, 2, 3, 4, 5]}\n')]
-        )
-    )
-    config = LLMInferenceConfig(json_mode=True)
-    resp = llm.prompt([LLMUserMessage(content=json_mode_prompt)], config)
-
-    assert resp.role == "assistant"
-    assert len(resp.content) == 1
-    content = resp.content[0]
-    assert isinstance(content, TextContent)
-    assert json.loads(content.text) == {"result": [1, 2, 3, 4, 5]}
-
-
-def test_json_mode_no_extra_text() -> None:
-    prompt = dedent("""
-        Generate some fake weather data as a JSON and then write a brief
-        weather report based on it.
-
-        Example JSON output:
-        {
-            "temperature_degC": 7,
-            "humidity_pct": 25,
-            "air_quality_index": 50
-        }
-    """)
-    stub_response = dedent("""
-        "temperature_degC": 7,
-        "humidity_pct": 25,
-        "air_quality_index": 50
-    }""")
-    llm = BedrockClaudeLLM(
-        client=make_test_bedrock_runtime_client([claude_response_with_content(stub_response)])
-    )
-    config = LLMInferenceConfig(json_mode=True)
-    resp = llm.prompt([LLMUserMessage(content=prompt)], config)
-
-    assert resp.role == "assistant"
-    with does_not_raise():
-        _ = json.loads(resp.to_text_only())
 
 
 def encode_image_to_base64_str(image_path: str | Path) -> str:
@@ -334,35 +266,33 @@ def test_large_system_prompt() -> None:
 
     It uses a large system prompt so that the minimum token limit is reached.
     """
-    long_system_prompt_path = Path(__file__).parent / "long_system_prompt.txt"
-    with long_system_prompt_path.open(encoding="utf-8") as file:
-        system_prompt = file.read()
+    long_system_prompt = build_long_system_prompt()
 
-        text_content = TextContent(text="Output the word hello backwards and only that.")
-        llm = BedrockClaudeLLM(
-            model_id=CLAUDE_BEDROCK_MODEL_IDS["Claude 3.5 Haiku"],
-            client=make_test_bedrock_runtime_client(
-                [
-                    claude_response_with_content(
-                        [{"type": "text", "text": "olleh"}],
-                        {
-                            "usage": {
-                                "input_tokens": 123,
-                                "output_tokens": 321,
-                                "cache_creation_input_tokens": 2500,
-                                "cache_read_input_tokens": 0,
-                            }
-                        },
-                    )
-                ]
-            ),
-        )
-        config = LLMInferenceConfig(system_prompt=system_prompt)
-        request = llm.create_request(
-            [LLMUserMessage(content=[text_content, CachePointContent()])], config
-        )
-        response = llm.invoke_model_with_request(request)
+    text_content = TextContent(text="Output the word hello backwards and only that.")
+    llm = BedrockClaudeLLM(
+        model_id=CLAUDE_4_5_HAIKU,
+        client=make_test_bedrock_runtime_client(
+            [
+                claude_response_with_content(
+                    [{"type": "text", "text": "olleh"}],
+                    {
+                        "usage": {
+                            "input_tokens": 123,
+                            "output_tokens": 321,
+                            "cache_creation_input_tokens": 2500,
+                            "cache_read_input_tokens": 0,
+                        }
+                    },
+                )
+            ]
+        ),
+    )
+    config = LLMInferenceConfig(system_prompt=long_system_prompt)
+    request = llm.create_request(
+        [LLMUserMessage(content=[text_content, CachePointContent()])], config
+    )
+    response = llm.invoke_model_with_request(request)
 
-        assert response.content == [ClaudeTextContent(text="olleh")]
-        assert response.usage.cache_creation_input_tokens is not None
-        assert response.usage.cache_creation_input_tokens > 0
+    assert response.content == [ClaudeTextContent(text="olleh")]
+    assert response.usage.cache_creation_input_tokens is not None
+    assert response.usage.cache_creation_input_tokens > 0

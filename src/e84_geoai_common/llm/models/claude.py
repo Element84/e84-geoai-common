@@ -8,7 +8,7 @@ import boto3
 import botocore.config
 import botocore.exceptions
 from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from e84_geoai_common.llm.core.llm import (
     LLM,
@@ -182,6 +182,21 @@ class ClaudeTool(ClaudeCacheableContent):
     input_schema: dict[str, Any]
 
 
+class JSONSchemaFormat(BaseModel):
+    """JSON schema to be used for formatting the output."""
+
+    type: Literal["json_schema"] = "json_schema"
+    schema_: dict[str, Any] = Field(alias="schema")
+
+
+class ClaudeOutputConfig(BaseModel):
+    """Configuration for the output of a Claude response."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    format: JSONSchemaFormat
+
+
 class ClaudeInvokeLLMRequest(BaseModel, frozen=True):
     """Represents a request to invoke Claude and get a response back."""
 
@@ -220,6 +235,10 @@ class ClaudeInvokeLLMRequest(BaseModel, frozen=True):
 
     top_p: float | None = Field(default=None, description="Top P for nucleus sampling")
 
+    output_config: ClaudeOutputConfig | None = Field(
+        default=None, description="Configuration for the output of the model."
+    )
+
 
 #################################################################################
 # Other response objects
@@ -250,6 +269,16 @@ class ClaudeUsageInfo(BaseModel, frozen=True):
     cache_creation: ClaudeCacheCreationInfo | None = None
 
 
+class ClaudeStopDetails(BaseModel, frozen=True):
+    """Structured information about a refusal."""
+
+    type: Literal["refusal"]
+    category: Literal["cyber", "bio"] = Field(
+        description="The policy category that triggered the refusal."
+    )
+    explanation: str | None = Field(default=None, description="Explanation for the refusal.")
+
+
 class ClaudeResponse(BaseModel, frozen=True):
     """Claude response model."""
 
@@ -259,7 +288,10 @@ class ClaudeResponse(BaseModel, frozen=True):
     id: str
     model: str
     role: Literal["assistant"] = "assistant"
-    stop_reason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
+    stop_reason: Literal[
+        "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "refusal"
+    ]
+    stop_details: ClaudeStopDetails | None = None
     stop_sequence: str | None = None
     type: Literal["message"]
     usage: ClaudeUsageInfo
@@ -316,6 +348,15 @@ def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
         input_schema = cast("dict[str, Any]", {"type": "object", "properties": {}})
     else:
         input_schema = tool.input_model.model_json_schema()
+        if "type" not in input_schema or any(
+            k in input_schema for k in ("oneOf", "anyOf", "allOf")
+        ):
+            raise ValueError(
+                "Tool input models must be JSON objects (i.e. model_json_schema must have "
+                '"type": "object") and must not use oneOf/anyOf/allOf at the root. '
+                "This usually happens when input_model is a union type. Consider using a custom "
+                "root model with a single field if you want to use a Union."
+            )
 
     description = tool.description
     if tool.output_model is not None:
@@ -372,6 +413,18 @@ def _llm_tool_result_to_claude_tool_result(
     return out
 
 
+class ClaudeRefusalError(Exception):
+    """Exception raised when Claude refuses to answer."""
+
+    stop_details: ClaudeStopDetails
+
+    def __init__(self, stop_details: ClaudeStopDetails) -> None:  # noqa: D107
+        self.stop_details = stop_details
+        super().__init__(
+            f"Claude refused to answer: {stop_details.category}, {stop_details.explanation}"
+        )
+
+
 class BedrockClaudeLLM(LLM):
     """Implements the LLM class for Bedrock Claude."""
 
@@ -379,13 +432,13 @@ class BedrockClaudeLLM(LLM):
 
     def __init__(
         self,
-        model_id: str = CLAUDE_3_5_HAIKU,
+        model_id: str = CLAUDE_4_5_HAIKU,
         client: BedrockRuntimeClient | None = None,
     ) -> None:
         """Initialize.
 
         Args:
-            model_id: Model ID. Defaults to the model ID for Claude 3 Haiku.
+            model_id: Model ID. Defaults to the model ID for Claude 4.5 Haiku.
             client: Optional pre-initialized boto3 client. Defaults to None.
         """
         self.model_id = model_id
@@ -397,14 +450,11 @@ class BedrockClaudeLLM(LLM):
     def create_request(
         self, messages: Sequence[LLMMessage], config: LLMInferenceConfig
     ) -> ClaudeInvokeLLMRequest:
-        stop_sequences = None
+        """Create a ClaudeInvokeLLMRequest from the given messages and inference config."""
         if config.json_mode:
-            # https://docs.aws.amazon.com/nova/latest/userguide/prompting-structured-output.html
-            prefix = "```json\n{"
-            messages = [*messages, LLMMessage(role="assistant", content=prefix)]
-            stop_sequences = ["```"]
-        elif config.response_prefix:
-            messages = [*messages, LLMMessage(role="assistant", content=config.response_prefix)]
+            raise ValueError("JSON mode is not supported for Bedrock Claude.")
+        if config.response_prefix is not None:
+            raise ValueError("Response prefix is not supported for Bedrock Claude.")
 
         tools = None
         tool_choice = None
@@ -414,7 +464,7 @@ class BedrockClaudeLLM(LLM):
 
             if _supports_caching(self.model_id) and config.cache_tools:
                 # If the model supports caching we'll cache all of the tool definitions by default.
-                # Everyt tool before the last tool will be included in this cache.
+                # Every tool before the last tool will be included in this cache.
                 last_tool = tools[-1]
                 last_tool.cache_control = ClaudeCacheControl()
 
@@ -430,6 +480,12 @@ class BedrockClaudeLLM(LLM):
                 ClaudeTextContent(cache_control=cache_control, text=config.system_prompt)
             ]
 
+        output_config = None
+        if config.structured_output_model is not None:
+            output_config = ClaudeOutputConfig(
+                format=JSONSchemaFormat(schema=config.structured_output_model.model_json_schema())
+            )
+
         return ClaudeInvokeLLMRequest(
             max_tokens=config.max_tokens,
             system=system_content,
@@ -438,8 +494,8 @@ class BedrockClaudeLLM(LLM):
             top_p=config.top_p,
             tools=tools,
             tool_choice=tool_choice,
-            stop_sequences=stop_sequences,
             messages=[_llm_message_to_claude_message(msg) for msg in messages],
+            output_config=output_config,
         )
 
     @timed_function
@@ -454,24 +510,33 @@ class BedrockClaudeLLM(LLM):
             raise ValueError("Must specify at least one message.")
         request = self.create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
-        llm_msg = self._response_to_llm_message(response, inference_cfg=inference_cfg)
+        llm_msg = self._response_to_llm_message(response)
         return llm_msg
 
     @timed_function
     def invoke_model_with_request(self, request: ClaudeInvokeLLMRequest) -> ClaudeResponse:
         """Invoke model with request and get a response back."""
+        request_body = request.model_dump_json(exclude_none=True, by_alias=True)
         try:
             response = self.client.invoke_model(
                 modelId=self.model_id,
                 # Regular Bedrock works without this value but LiteLLM requires it to work as proxy.
                 contentType="application/json",
-                body=request.model_dump_json(exclude_none=True),
+                body=request_body,
             )
         except botocore.exceptions.ClientError:
-            log.exception("Request body: %s", request.model_dump_json())
+            log.exception("Request body: %s", request_body)
             raise
         response_body = response["body"].read().decode("UTF-8")
-        claude_response = ClaudeResponse.model_validate_json(response_body)
+        try:
+            claude_response = ClaudeResponse.model_validate_json(response_body)
+        except ValidationError:
+            log.exception("Failed to validate Claude response: %s", response_body)
+            raise
+
+        if claude_response.stop_details is not None:
+            raise ClaudeRefusalError(stop_details=claude_response.stop_details)
+
         log.info("Token usage: %s", claude_response.usage)
         update_current_generation(
             usage_details={
@@ -483,20 +548,12 @@ class BedrockClaudeLLM(LLM):
         )
         return claude_response
 
-    def _response_to_llm_message(
-        self, response: ClaudeResponse, inference_cfg: LLMInferenceConfig
-    ) -> LLMAssistantMessage:
+    def _response_to_llm_message(self, response: ClaudeResponse) -> LLMAssistantMessage:
         def _to_llm_content(
-            index: int, c: ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent
+            c: ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent,
         ) -> TextContent | Base64ImageContent | LLMToolUseContent:
             match c:
-                case ClaudeTextContent():
-                    text = c.text
-                    if index == 0:
-                        if inference_cfg.json_mode:
-                            text = "{" + text.removesuffix("```")
-                        elif inference_cfg.response_prefix:
-                            text = inference_cfg.response_prefix + text
+                case ClaudeTextContent(text=text):
                     return TextContent(text=text)
                 case ClaudeImageContent():
                     return Base64ImageContent(media_type=c.source.media_type, data=c.source.data)
@@ -504,7 +561,7 @@ class BedrockClaudeLLM(LLM):
                     return LLMToolUseContent(id=c.id, name=c.name, input=c.input)
 
         return LLMAssistantMessage(
-            content=[_to_llm_content(i, c) for i, c in enumerate(response.content)],
+            content=[_to_llm_content(c) for c in response.content],
             metadata=LLMResponseMetadata(
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,

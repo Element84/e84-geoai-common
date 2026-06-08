@@ -26,7 +26,7 @@ def test_serialize_string_content() -> None:
             "content": [
                 {
                     "text": "Output the word hello backwards and only that.",
-                    "cache_point": None,
+                    "cachePoint": None,
                 }
             ],
         }
@@ -53,7 +53,7 @@ def test_serialize_text_content() -> None:
             "content": [
                 {
                     "text": "Output the word hello backwards and only that.",
-                    "cache_point": None,
+                    "cachePoint": None,
                 }
             ],
         }
@@ -83,7 +83,7 @@ def test_serialize_text_content_with_caching() -> None:
             "content": [
                 {
                     "text": "Output the word hello backwards and only that.",
-                    "cache_point": {"type": "default"},
+                    "cachePoint": {"type": "default"},
                 }
             ],
         }

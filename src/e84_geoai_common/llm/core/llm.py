@@ -75,7 +75,9 @@ class LLMResponseMetadata(BaseModel):
 
     input_tokens: int
     output_tokens: int
-    stop_reason: Literal["end_turn", "max_tokens", "stop_sequence", "tool_use"]
+    stop_reason: Literal[
+        "end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn", "refusal"
+    ]
 
 
 class LLMMessage(BaseModel, frozen=True):
@@ -258,6 +260,9 @@ class LLMInferenceConfig(BaseModel):
         default=None,
         description="Whether the model should use a specific "
         "tool, or any tool, or decide by itself.",
+    )
+    structured_output_model: type[BaseModel] | None = Field(
+        default=None, description="A Pydantic model for structured output."
     )
 
     @model_validator(mode="after")
