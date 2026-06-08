@@ -1,9 +1,14 @@
 import json
-from typing import Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
+import pytest
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
-from e84_geoai_common.llm.extraction import extract_data_from_text
+from e84_geoai_common.llm.extraction import (
+    extract_data_from_text,
+    extract_data_from_text_claude_structured_output,
+)
 from e84_geoai_common.llm.models.claude import BedrockClaudeLLM
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     claude_response_with_content,
@@ -11,7 +16,11 @@ from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
 )
 
 
-def test_extract():
+@pytest.mark.parametrize(
+    "extraction_func",
+    [extract_data_from_text, extract_data_from_text_claude_structured_output],
+)
+def test_extract(extraction_func: Callable[..., BaseModel]):
     class ShoppingItem(BaseModel):
         model_config = ConfigDict(strict=True, extra="forbid")
 
@@ -36,10 +45,11 @@ def test_extract():
         ]
     )
 
-    mock_resp_json = expected_result.model_dump_json()
-    client = make_test_bedrock_runtime_client([claude_response_with_content(mock_resp_json)])
+    client = make_test_bedrock_runtime_client(
+        [_make_mock_response(extraction_func.__name__, expected_result.model_dump(mode="json"))]
+    )
     llm = BedrockClaudeLLM(client=client)
-    result = extract_data_from_text(
+    result = extraction_func(
         llm=llm,
         model_type=ShoppingList,
         system_prompt=system_prompt,
@@ -48,21 +58,34 @@ def test_extract():
     assert result.model_dump(mode="json") == expected_result.model_dump(mode="json")
 
 
-def test_extract_with_union_of_basic_types_at_root():
+@pytest.mark.parametrize(
+    "extraction_func",
+    [extract_data_from_text, extract_data_from_text_claude_structured_output],
+)
+def test_extract_with_union_of_basic_types_at_root(extraction_func: Callable[..., BaseModel]):
     class StringOrList(RootModel[str | list[str]]):
         pass
 
-    system_prompt = """
-    Split the given delimited string. Return a single string if there is only one item, otherwise,
-    a list.
+    system_prompt = """Parse a semicolon-delimited string:
+- Split the input string by semicolons (;)
+- Strip whitespace from each item
+- If there is exactly 1 item, return it as a single string
+- If there are 2 or more items, return them as a list of strings
     """
-    user_prompt = "apple|banana|orange"
+    user_prompt = "apple;banana;orange"
     expected_result = StringOrList(root=["apple", "banana", "orange"])
 
-    mock_resp_json = expected_result.model_dump_json()
-    client = make_test_bedrock_runtime_client([claude_response_with_content(mock_resp_json)])
+    client = make_test_bedrock_runtime_client(
+        [
+            _make_mock_response(
+                extraction_func.__name__,
+                expected_result.model_dump(mode="json"),
+                wrap=extraction_func.__name__ == "extract_data_from_text",
+            )
+        ]
+    )
     llm = BedrockClaudeLLM(client=client)
-    result = extract_data_from_text(
+    result = extraction_func(
         llm=llm,
         model_type=StringOrList,
         system_prompt=system_prompt,
@@ -71,7 +94,13 @@ def test_extract_with_union_of_basic_types_at_root():
     assert result.model_dump(mode="json") == expected_result.model_dump(mode="json")
 
 
-def test_extract_with_union_of_models_at_root():
+@pytest.mark.parametrize(
+    "extraction_func",
+    [extract_data_from_text, extract_data_from_text_claude_structured_output],
+)
+def test_extract_with_union_of_models_at_root(
+    extraction_func: Callable[..., BaseModel],
+):
     class ItemA(BaseModel):
         model_config = ConfigDict(strict=True, extra="forbid")
 
@@ -99,13 +128,38 @@ def test_extract_with_union_of_models_at_root():
     }
 
     client = make_test_bedrock_runtime_client(
-        [claude_response_with_content([{"text": json.dumps({"data": expected_result})}])]
+        [_make_mock_response(extraction_func.__name__, expected_result, wrap=True)]
     )
     llm = BedrockClaudeLLM(client=client)
-    result = extract_data_from_text(
+    result = extraction_func(
         llm=llm,
         model_type=Item,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
     )
     assert result.model_dump(mode="json") == expected_result
+
+
+def _make_mock_response(
+    extraction_func_name: str, expected_result: dict[str, Any], *, wrap: bool = False
+) -> dict[str, Any]:
+    if wrap:
+        expected_result = {
+            "data": expected_result,
+        }
+    match extraction_func_name:
+        case "extract_data_from_text_claude_structured_output":
+            return claude_response_with_content([{"text": json.dumps(expected_result)}])
+        case "extract_data_from_text":
+            return claude_response_with_content(
+                [
+                    {
+                        "id": "tool-use-1",
+                        "name": "parse_data",
+                        "input": expected_result,
+                    }
+                ],
+                overrides={"stop_reason": "tool_use"},
+            )
+        case _:
+            raise ValueError(f"Unexpected extraction function: {extraction_func_name}")

@@ -73,11 +73,6 @@ def extract_data_from_text[Model: BaseModel](
         Model: The extracted data model validated against the specified model
             type.
     """
-    if isinstance(llm, BedrockClaudeLLM):
-        return extract_data_from_text_claude(
-            llm=llm, model_type=model_type, system_prompt=system_prompt, user_prompt=user_prompt
-        )
-
     input_schema = model_type.model_json_schema()
     is_wrapped_model = False
     if "anyOf" in input_schema:
@@ -115,7 +110,7 @@ def extract_data_from_text[Model: BaseModel](
     raise ExtractionError(f"LLM response did not contain tool use content: {resp}")
 
 
-def extract_data_from_text_claude[Model: BaseModel](
+def extract_data_from_text_claude_structured_output[Model: BaseModel](
     *, llm: BedrockClaudeLLM, model_type: type[Model], system_prompt: str, user_prompt: str
 ) -> Model:
     """Extract data from text using Claude's native structured output support."""
