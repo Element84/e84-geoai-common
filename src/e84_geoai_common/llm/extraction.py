@@ -57,7 +57,12 @@ class DataModelWrapper[Model: BaseModel](BaseModel):
 
 
 def extract_data_from_text[Model: BaseModel](
-    *, llm: LLM, model_type: type[Model], system_prompt: str, user_prompt: str
+    *,
+    llm: LLM,
+    model_type: type[Model],
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 10_000,
 ) -> Model:
     """Extract data from text using an LLM given system and user prompts.
 
@@ -68,6 +73,8 @@ def extract_data_from_text[Model: BaseModel](
         system_prompt (str): The prompt for the system to process the user
             input.
         user_prompt (str): The user input text for data extraction.
+        max_tokens (int, optional): The maximum allowed number of tokens to generate in
+            the LLM response. Defaults to 10,000.
 
     Returns:
         Model: The extracted data model validated against the specified model
@@ -94,6 +101,7 @@ def extract_data_from_text[Model: BaseModel](
             ),
         ],
         tool_choice=LLMToolChoice(mode="force_specific_tool_use", tool_name="parse_data"),
+        max_tokens=max_tokens,
     )
     messages = [LLMMessage(role="user", content=user_prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=inference_cfg)
@@ -111,7 +119,12 @@ def extract_data_from_text[Model: BaseModel](
 
 
 def extract_data_from_text_claude_structured_output[Model: BaseModel](
-    *, llm: BedrockClaudeLLM, model_type: type[Model], system_prompt: str, user_prompt: str
+    *,
+    llm: BedrockClaudeLLM,
+    model_type: type[Model],
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 10_000,
 ) -> Model:
     """Extract data from text using Claude's native structured output support."""
     input_schema = model_type.model_json_schema()
@@ -123,7 +136,7 @@ def extract_data_from_text_claude_structured_output[Model: BaseModel](
         input_model = model_type
 
     inference_cfg = LLMInferenceConfig(
-        system_prompt=system_prompt, structured_output_model=input_model
+        system_prompt=system_prompt, structured_output_model=input_model, max_tokens=max_tokens
     )
     messages = [LLMMessage(role="user", content=user_prompt)]
     resp = llm.prompt(messages=messages, inference_cfg=inference_cfg)
