@@ -49,6 +49,8 @@ CLAUDE_4_5_SONNET = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 CLAUDE_4_5_OPUS = "us.anthropic.claude-opus-4-5-20251101-v1:0"
 CLAUDE_4_6_SONNET = "us.anthropic.claude-sonnet-4-6"
 CLAUDE_4_6_OPUS = "us.anthropic.claude-opus-4-6-v1"
+CLAUDE_4_7_OPUS = "us.anthropic.claude-opus-4-7"
+CLAUDE_4_8_OPUS = "us.anthropic.claude-opus-4-8"
 
 
 _MODELS_NOT_SUPPORTING_CACHING = {
