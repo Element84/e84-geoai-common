@@ -551,7 +551,9 @@ class BedrockClaudeLLM(LLM):
         return claude_response
 
     def response_to_llm_message(
-        self, response: ClaudeResponse, inference_cfg: LLMInferenceConfig
+        self,
+        response: ClaudeResponse,
+        inference_cfg: LLMInferenceConfig,  # noqa: ARG002
     ) -> LLMAssistantMessage:
         def _to_llm_content(
             c: ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent,
