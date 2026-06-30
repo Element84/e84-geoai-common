@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: ["main"]
   schedule: # Run snyk scan daily at midnight
-    - cron: '0 0 * * *'
+    - cron: "0 0 * * *"
 
 permissions:
   contents: read
@@ -24,11 +24,11 @@ jobs:
       - uses: actions/checkout@master
 
       - name: Snyk Python report vulnerabilities
-        uses: snyk/actions/python-3.10@master
+        uses: snyk/actions/python-3.12@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args:
+          args: --file=requirements.txt
             --sarif-file-output=snyk.sarif
             --policy-path=.snyk
             --severity-threshold=high # Forces fail on high-severity vulnerabilities

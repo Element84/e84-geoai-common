@@ -1,3 +1,5 @@
+# ruff: noqa: N815
+
 import logging
 from collections.abc import Sequence
 from functools import reduce
@@ -58,7 +60,7 @@ class NovaCachePoint(BaseModel):
 
 
 class NovaCacheableContent(BaseModel):
-    cache_point: NovaCachePoint | None = Field(default=None)
+    cachePoint: NovaCachePoint | None = Field(default=None)
 
 
 class NovaTextContent(NovaCacheableContent):
@@ -199,7 +201,7 @@ def _llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
                 acc_until_last: tuple[NovaTextContent | NovaImageContent, ...] = acc[:-1]
 
                 last_content = acc[-1]
-                last_content.cache_point = NovaCachePoint()
+                last_content.cachePoint = NovaCachePoint()
 
                 return (*acc_until_last, last_content)
 
