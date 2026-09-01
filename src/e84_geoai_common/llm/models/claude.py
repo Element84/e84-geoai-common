@@ -249,7 +249,7 @@ class ClaudeInvokeLLMRequest(BaseModel, frozen=True):
 class ClaudeCacheCreationInfo(BaseModel, frozen=True):
     """Breakdown of cached tokens by TTL."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
 
     ephemeral_1h_input_tokens: int = Field(
         description="The number of input tokens used to create the 1 hour cache entry."
@@ -262,7 +262,7 @@ class ClaudeCacheCreationInfo(BaseModel, frozen=True):
 class ClaudeUsageInfo(BaseModel, frozen=True):
     """Claude usage-info model."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
 
     input_tokens: int
     output_tokens: int
@@ -284,7 +284,7 @@ class ClaudeStopDetails(BaseModel, frozen=True):
 class ClaudeResponse(BaseModel, frozen=True):
     """Claude response model."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
 
     content: Sequence[ClaudeTextContent | ClaudeToolUseContent]
     id: str
