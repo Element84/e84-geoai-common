@@ -1,6 +1,10 @@
 """Wrappers for Bedrock Converse API."""
 
 from e84_geoai_common.llm.models.converse.converse import (
+    COHERE_COMMAND_LIGHT_TEXT,
+    COHERE_COMMAND_R,
+    COHERE_COMMAND_R_PLUS,
+    COHERE_COMMAND_TEXT,
     CONVERSE_BEDROCK_MODEL_IDS,
     LLAMA_3_1_8_B_INSTRUCT,
     LLAMA_3_1_70_B_INSTRUCT,
@@ -9,6 +13,14 @@ from e84_geoai_common.llm.models.converse.converse import (
     LLAMA_3_2_11_B_VISION_INSTRUCT,
     LLAMA_3_2_90_B_VISION_INSTRUCT,
     LLAMA_3_3_70_B_INSTRUCT,
+    MISTRAL_7B_INSTRUCT,
+    MISTRAL_8X7B_INSTRUCT,
+    MISTRAL_LARGE,
+    MISTRAL_LARGE_2407,
+    MISTRAL_SMALL,
+    TITAN_TEXT_EXPRESS,
+    TITAN_TEXT_LITE,
+    TITAN_TEXT_PREMIER,
     BedrockConverseLLM,
     ConverseInferenceConfig,
     ConverseInvokeLLMRequest,
@@ -61,6 +73,10 @@ from e84_geoai_common.llm.models.converse.tool_use_types import (
 )
 
 __all__ = [
+    "COHERE_COMMAND_LIGHT_TEXT",
+    "COHERE_COMMAND_R",
+    "COHERE_COMMAND_R_PLUS",
+    "COHERE_COMMAND_TEXT",
     "CONVERSE_BEDROCK_MODEL_IDS",
     "LLAMA_3_1_8_B_INSTRUCT",
     "LLAMA_3_1_70_B_INSTRUCT",
@@ -69,6 +85,14 @@ __all__ = [
     "LLAMA_3_2_11_B_VISION_INSTRUCT",
     "LLAMA_3_2_90_B_VISION_INSTRUCT",
     "LLAMA_3_3_70_B_INSTRUCT",
+    "MISTRAL_7B_INSTRUCT",
+    "MISTRAL_8X7B_INSTRUCT",
+    "MISTRAL_LARGE",
+    "MISTRAL_LARGE_2407",
+    "MISTRAL_SMALL",
+    "TITAN_TEXT_EXPRESS",
+    "TITAN_TEXT_LITE",
+    "TITAN_TEXT_PREMIER",
     "BedrockConverseLLM",
     "ConverseAdditionalModelRequestFields",
     "ConverseAnyToolChoice",
