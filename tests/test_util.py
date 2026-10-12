@@ -8,7 +8,7 @@ def test_unique_by() -> None:
 
     # Tests uniqueness with a key function
     words = ["foo", "rock", "snow", "a", "longer", "b"]
-    output = unique_by(words, key_fn=lambda s: len(s))
+    output = unique_by(words, key_fn=len)
     assert list(output) == ["foo", "rock", "a", "longer"]
 
     # Verifies the duplicate handler function is called with correct args
@@ -16,7 +16,7 @@ def test_unique_by() -> None:
 
     output = unique_by(
         words,
-        key_fn=lambda s: len(s),
+        key_fn=len,
         duplicate_handler_fn=lambda s, length: dups.append((s, length)),
     )
     assert list(output) == ["foo", "rock", "a", "longer"]

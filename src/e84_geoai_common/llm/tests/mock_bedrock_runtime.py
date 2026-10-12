@@ -113,6 +113,7 @@ class _MockBedrockRuntimeClient(BedrockRuntimeClient):
             "body": _string_to_streaming_body(json.dumps(next_resp)),
             "contentType": "application/json",
             "performanceConfigLatency": "standard",
+            "serviceTier": "default",
             "ResponseMetadata": {
                 "RequestId": "123",
                 "HTTPStatusCode": 200,

@@ -59,7 +59,6 @@ typeCheckingMode = "strict"
 reportGeneralTypeIssues = true
 reportImplicitStringConcatenation = "none"
 reportPropertyTypeMismatch = "error"
-reportShadowedImports = "error"
 reportTypedDictNotRequiredAccess = "none"
 reportUninitializedInstanceVariable = "error"
 reportUnknownArgumentType = "error"
@@ -102,7 +101,9 @@ ignore = [
   # TO DO comment missing linked issue
   'TD003',
   # TO DO missing colon
-  'TD004']
+  'TD004',
+  # Missing copyright notice at top of file
+  'CPY001']
 
 [tool.ruff.lint.per-file-ignores]
 '__init__.py' = [

@@ -114,7 +114,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
             )
             raise RuntimeError(error_details)
 
-        job_id = job_arn.split("/")[-1]
+        job_id = job_arn.rsplit("/", maxsplit=1)[-1]
 
         input_data_config = job_details["inputDataConfig"]
         s3_input_config = input_data_config["s3InputDataConfig"]
@@ -190,7 +190,7 @@ class BedrockBatchInference[RequestModel: BaseModel, ResponseModel: BaseModel]:
 
         return job_arn_found
 
-    def create_job(  # noqa: PLR0913
+    def create_job(  # noqa: PLR0913, PLR0917
         self,
         job_name: str,
         role_arn: str,

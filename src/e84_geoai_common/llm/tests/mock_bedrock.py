@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import json
 import os
 from collections.abc import Iterable
@@ -110,7 +110,7 @@ class MockBedrockClient(BedrockClient):
     def get_model_invocation_job(
         self, **_kwargs: Unpack[GetModelInvocationJobRequestTypeDef]
     ) -> GetModelInvocationJobResponseTypeDef:
-        example_date = datetime.datetime.now(tz=datetime.UTC)
+        example_date = dt.datetime.now(tz=dt.UTC)
         response: GetModelInvocationJobResponseTypeDef = {
             "jobArn": self.job_arn,
             "jobName": self.job_name,
@@ -130,6 +130,11 @@ class MockBedrockClient(BedrockClient):
             },
             "timeoutDurationInHours": 24,
             "jobExpirationTime": example_date,
+            "modelInvocationType": "InvokeModel",
+            "totalRecordCount": 1,
+            "processedRecordCount": 1,
+            "successRecordCount": 1,
+            "errorRecordCount": 0,
             "ResponseMetadata": self.response_metadata,
         }
 
@@ -152,7 +157,7 @@ class MockBedrockClient(BedrockClient):
     def get_paginator(self, operation_name: str) -> Any:  # noqa: ANN401
         """Returns a mock paginator for list_model_invocation_jobs."""
         if operation_name == "list_model_invocation_jobs":
-            example_date = datetime.datetime.now(tz=datetime.UTC)
+            example_date = dt.datetime.now(tz=dt.UTC)
 
             mock_job_summary_1: ModelInvocationJobSummaryTypeDef = {
                 "jobArn": self.job_arn,
