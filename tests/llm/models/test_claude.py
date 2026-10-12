@@ -1,6 +1,7 @@
 import base64
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel, Field
 from rich import print as rich_print
 
@@ -11,6 +12,7 @@ from e84_geoai_common.llm.core.llm import (
     JSONContent,
     LLMInferenceConfig,
     LLMTool,
+    LLMToolChoice,
     LLMToolResultContent,
     LLMToolUseContent,
     LLMUserMessage,
@@ -18,8 +20,11 @@ from e84_geoai_common.llm.core.llm import (
 )
 from e84_geoai_common.llm.models.claude import (
     CLAUDE_4_5_HAIKU,
+    CLAUDE_5_5_HAIKU,
+    CLAUDE_5_5_OPUS,
     BedrockClaudeLLM,
     ClaudeTextContent,
+    ClaudeToolChoice,
 )
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     _MockBedrockRuntimeClient,  # type: ignore[reportPrivateUsage]
@@ -296,3 +301,98 @@ def test_large_system_prompt() -> None:
     assert response.content == [ClaudeTextContent(text="olleh")]
     assert response.usage.cache_creation_input_tokens is not None
     assert response.usage.cache_creation_input_tokens > 0
+
+
+def test_thinking_blocks_are_dropped() -> None:
+    llm = BedrockClaudeLLM(
+        model_id=CLAUDE_5_5_HAIKU,
+        client=make_test_bedrock_runtime_client(
+            [
+                claude_response_with_content(
+                    [
+                        {"type": "thinking", "thinking": "", "signature": "abc123"},
+                        {"type": "redacted_thinking", "data": "encrypted"},
+                        {"type": "text", "text": "olleh"},
+                    ]
+                )
+            ]
+        ),
+    )
+    resp = llm.prompt(
+        [LLMUserMessage(content="Output the word hello backwards and only that.")],
+        LLMInferenceConfig(max_tokens=4000),
+    )
+    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
+        "role": "assistant",
+        "content": [{"text": "olleh"}],
+        "metadata": {"stop_reason": "end_turn"},
+    }
+
+
+def test_sampling_params_omitted_for_newer_models() -> None:
+    messages = [LLMUserMessage(content="hello")]
+    old_llm = BedrockClaudeLLM(
+        model_id=CLAUDE_4_5_HAIKU, client=make_test_bedrock_runtime_client([])
+    )
+    assert old_llm.create_request(messages, LLMInferenceConfig()).temperature == 0
+
+    for model_id in [CLAUDE_5_5_OPUS, "global.anthropic.claude-opus-5-5"]:
+        llm = BedrockClaudeLLM(model_id=model_id, client=make_test_bedrock_runtime_client([]))
+        assert llm.create_request(messages, LLMInferenceConfig()).temperature is None
+        with pytest.raises(ValueError, match="not supported"):
+            llm.create_request(messages, LLMInferenceConfig(temperature=0.5))
+        with pytest.raises(ValueError, match="not supported"):
+            llm.create_request(messages, LLMInferenceConfig(top_p=0.5))
+
+
+class Country(BaseModel):
+    name: str
+
+
+class City(BaseModel):
+    name: str
+    country: Country
+
+
+def test_structured_output_schema_disallows_additional_properties() -> None:
+    llm = BedrockClaudeLLM(client=make_test_bedrock_runtime_client([]))
+    request = llm.create_request(
+        [LLMUserMessage(content="hello")], LLMInferenceConfig(structured_output_model=City)
+    )
+    assert request.output_config is not None
+    schema = request.output_config.format.schema_
+    assert schema["additionalProperties"] is False
+    assert schema["$defs"]["Country"]["additionalProperties"] is False
+
+
+def test_forced_tool_choice_replaced_for_models_that_reject_it() -> None:
+    messages = [LLMUserMessage(content="hello")]
+    config = LLMInferenceConfig(
+        system_prompt="Be helpful.",
+        tools=[
+            LLMTool(
+                name="parse_data",
+                description="Parse the data.",
+                input_model=City,
+                output_model=None,
+            )
+        ],
+        tool_choice=LLMToolChoice(mode="force_specific_tool_use", tool_name="parse_data"),
+    )
+
+    old_llm = BedrockClaudeLLM(
+        model_id=CLAUDE_4_5_HAIKU, client=make_test_bedrock_runtime_client([])
+    )
+    request = old_llm.create_request(messages, config)
+    assert request.tool_choice == ClaudeToolChoice(type="tool", name="parse_data")
+    assert request.system is not None
+    assert len(request.system) == 1
+
+    llm = BedrockClaudeLLM(model_id=CLAUDE_5_5_OPUS, client=make_test_bedrock_runtime_client([]))
+    request = llm.create_request(messages, config)
+    assert request.tool_choice == ClaudeToolChoice(type="auto")
+    assert request.system is not None
+    assert [c.text for c in request.system if isinstance(c, ClaudeTextContent)] == [
+        "Be helpful.",
+        "You must call the `parse_data` tool in your response.",
+    ]
