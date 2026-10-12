@@ -19,13 +19,14 @@ from e84_geoai_common.llm.core.llm import (
     LLMDataContentType,
     LLMInferenceConfig,
     LLMMessage,
-    LLMMessageContentType,
     LLMResponseMetadata,
     LLMTool,
     LLMToolChoice,
     LLMToolResultContent,
     LLMToolUseContent,
+    RedactedThinkingContent,
     TextContent,
+    ThinkingContent,
 )
 from e84_geoai_common.llm.models.claude import (
     CLAUDE_3_5_HAIKU,
@@ -37,6 +38,7 @@ from e84_geoai_common.llm.models.claude import (
     CLAUDE_4_5_HAIKU,
     CLAUDE_4_SONNET,
     CLAUDE_INSTANT,
+    validate_claude_sampling_params,
 )
 from e84_geoai_common.llm.models.converse.data_content_types import (
     ConverseCachePoint,
@@ -151,7 +153,13 @@ class ConverseInvokeLLMRequest(BaseModel):
 def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
     """Converts the generic LLM Message into a ConverseMessage."""
 
-    def _handle_content(content: LLMMessageContentType) -> ConverseMessageContentType:
+    def _handle_content(
+        content: TextContent
+        | Base64ImageContent
+        | LLMToolUseContent
+        | LLMToolResultContent
+        | CachePointContent,
+    ) -> ConverseMessageContentType:
         """Convert `LLMMessageContentType` to a list of `ConverseMessageContentType`.
 
         This function returns a list the AWS Bedrock Converse API treats a
@@ -182,7 +190,12 @@ def _llm_message_to_converse_message(msg: LLMMessage) -> ConverseMessage:
     if isinstance(msg.content, str):
         content = [ConverseTextContent(text=msg.content)]
     else:
-        content = [_handle_content(content) for content in msg.content]
+        # Thinking content comes from other providers and isn't sent through Converse.
+        content = [
+            _handle_content(content)
+            for content in msg.content
+            if not isinstance(content, ThinkingContent | RedactedThinkingContent)
+        ]
     return ConverseMessage(role=msg.role, content=content)
 
 
@@ -291,15 +304,17 @@ class BedrockConverseLLM(LLM):
             # For now, just support for a single system prompt content block
             system = [SystemContentBlock(text=config.system_prompt)]
 
+        # Claude models reached through Converse may reject sampling params.
+        send_sampling_params = validate_claude_sampling_params(self.model_id, config)
         inference_config = ConverseInferenceConfig(
             maxTokens=config.max_tokens,
             stopSequences=stop_sequences,
-            temperature=config.temperature,
-            topP=config.top_p,
+            temperature=config.temperature if send_sampling_params else None,
+            topP=config.top_p if send_sampling_params else None,
         )
 
         additional_model_request_fields = None
-        if config.top_k:
+        if config.top_k and send_sampling_params:
             additional_model_request_fields = ConverseAdditionalModelRequestFields(
                 top_k=config.top_k
             )

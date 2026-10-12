@@ -203,6 +203,8 @@ def test_tool_use_json() -> None:
                         "toolUseId": "abc123",
                         "name": "GetWeatherInfo",
                         "input": {"place": "Philadelphia"},
+                        # Bedrock now includes this. It's ignored when parsing.
+                        "type": "tool_use",
                     }
                 },
             ],
@@ -284,6 +286,8 @@ def test_tool_use_image() -> None:
                         "toolUseId": "abc123",
                         "name": "GenerateImage",
                         "input": {"description": "A cat"},
+                        # Bedrock now includes this. It's ignored when parsing.
+                        "type": "tool_use",
                     }
                 },
             ],

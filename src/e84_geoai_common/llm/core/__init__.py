@@ -18,7 +18,9 @@ from e84_geoai_common.llm.core.llm import (
     LLMToolResultContent,
     LLMToolUseContent,
     LLMUserMessage,
+    RedactedThinkingContent,
     TextContent,
+    ThinkingContent,
 )
 
 __all__ = [
@@ -39,5 +41,7 @@ __all__ = [
     "LLMToolResultContent",
     "LLMToolUseContent",
     "LLMUserMessage",
+    "RedactedThinkingContent",
     "TextContent",
+    "ThinkingContent",
 ]

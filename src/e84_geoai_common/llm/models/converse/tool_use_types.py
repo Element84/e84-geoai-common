@@ -72,7 +72,9 @@ class ConverseToolConfig(BaseModel):
 class ConverseToolUse(BaseModel):
     """Converse tool-use request model, inner."""
 
-    model_config = ConfigDict(strict=True, extra="forbid")
+    # Also parsed from responses, which can include new fields (e.g. "type"). They're ignored
+    # rather than kept so they aren't sent back in later requests.
+    model_config = ConfigDict(strict=True, extra="ignore")
 
     toolUseId: str
     name: str

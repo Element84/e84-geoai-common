@@ -13,7 +13,8 @@ from e84_geoai_common.llm.models.converse.msg_types import (
 class ConverseUsageInfo(BaseModel):
     """Usage info from the Converse API."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    # Lenient so new fields from the API don't break parsing.
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
 
     inputTokens: int
     outputTokens: int
@@ -23,13 +24,15 @@ class ConverseUsageInfo(BaseModel):
 
 
 class ConverseMessageResponse(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    # Lenient so new fields from the API don't break parsing.
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
 
     message: ConverseAssistantMessage
 
 
 class ConverseMetrics(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    # Lenient so new fields from the API don't break parsing.
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
 
     latencyMs: int
 
@@ -53,7 +56,8 @@ class ConverseAdditionalModelRequestFields(BaseModel):
 class ConverseResponse(BaseModel):
     """Converse response model."""
 
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+    # Lenient so new fields from the API don't break parsing.
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
 
     additionalModelResponseFields: dict[str, Any] | None = Field(default=None)
     metrics: ConverseMetrics

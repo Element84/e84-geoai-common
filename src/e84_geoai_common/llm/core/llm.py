@@ -63,8 +63,37 @@ class CachePointContent(BaseModel):
     type: Literal["default"] = "default"
 
 
+class ThinkingContent(BaseModel):
+    """Reasoning the model produced before its response.
+
+    Some providers (e.g. Claude) require thinking blocks to be sent back unchanged in later turns,
+    for example alongside a tool result, so they are kept in assistant messages.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    thinking: str
+    signature: str | None = Field(
+        default=None, description="Provider signature used to verify the thinking block."
+    )
+
+
+class RedactedThinkingContent(BaseModel):
+    """Reasoning the provider returned encrypted. It must be sent back unchanged."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    data: str
+
+
 LLMMessageContentType = (
-    TextContent | Base64ImageContent | LLMToolUseContent | LLMToolResultContent | CachePointContent
+    TextContent
+    | Base64ImageContent
+    | LLMToolUseContent
+    | LLMToolResultContent
+    | CachePointContent
+    | ThinkingContent
+    | RedactedThinkingContent
 )
 
 
@@ -95,12 +124,14 @@ class LLMMessage(BaseModel, frozen=True):
     def to_text_only(self) -> str:
         """Returns the message as text.
 
-        Fails if the message is anything other than text
+        Thinking content is ignored. Fails if the message has any other non-text content.
         """
         if isinstance(self.content, str):
             return self.content
         parts: list[str] = []
         for item in self.content:
+            if isinstance(item, ThinkingContent | RedactedThinkingContent):
+                continue
             if not isinstance(item, TextContent):
                 raise TypeError("The llm message is not just text")
             parts.append(item.text)

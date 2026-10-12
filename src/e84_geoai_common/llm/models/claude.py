@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any, Literal, cast
 
@@ -24,7 +25,10 @@ from e84_geoai_common.llm.core.llm import (
     LLMToolChoice,
     LLMToolResultContent,
     LLMToolUseContent,
+    LLMUserMessage,
+    RedactedThinkingContent,
     TextContent,
+    ThinkingContent,
 )
 from e84_geoai_common.tracing import observe, timed_function, update_current_generation
 
@@ -58,57 +62,74 @@ CLAUDE_5_5_SONNET = "us.anthropic.claude-sonnet-5-5"
 CLAUDE_5_5_HAIKU = "us.anthropic.claude-haiku-5-5"
 
 
-_MODELS_NOT_SUPPORTING_CACHING = {
-    CLAUDE_3_HAIKU,
-    CLAUDE_3_5_SONNET,
-    CLAUDE_3_SONNET,
-    CLAUDE_3_OPUS,
-    CLAUDE_INSTANT,
-    CLAUDE_3_5_SONNET_V2,
+@dataclass(frozen=True)
+class ClaudeModelCapabilities:
+    """Which request features a Claude model accepts."""
+
+    caching: bool = True
+    # temperature, top_p, and top_k
+    sampling_params: bool = True
+    # A tool_choice of "any" or "tool"
+    forced_tool_choice: bool = True
+
+
+_NO_SAMPLING_PARAMS = ClaudeModelCapabilities(sampling_params=False)
+
+# Every model constant above must have an entry here. Keys are "us." model IDs.
+_MODEL_CAPABILITIES: dict[str, ClaudeModelCapabilities] = {
+    CLAUDE_3_HAIKU: ClaudeModelCapabilities(caching=False),
+    CLAUDE_3_5_SONNET: ClaudeModelCapabilities(caching=False),
+    CLAUDE_3_SONNET: ClaudeModelCapabilities(caching=False),
+    CLAUDE_3_OPUS: ClaudeModelCapabilities(caching=False),
+    CLAUDE_INSTANT: ClaudeModelCapabilities(caching=False),
+    CLAUDE_3_5_HAIKU: ClaudeModelCapabilities(),
+    CLAUDE_3_5_SONNET_V2: ClaudeModelCapabilities(caching=False),
+    CLAUDE_3_7_SONNET: ClaudeModelCapabilities(),
+    CLAUDE_4_SONNET: ClaudeModelCapabilities(),
+    CLAUDE_4_OPUS: ClaudeModelCapabilities(),
+    CLAUDE_4_1_OPUS: ClaudeModelCapabilities(),
+    CLAUDE_4_5_HAIKU: ClaudeModelCapabilities(),
+    CLAUDE_4_5_SONNET: ClaudeModelCapabilities(),
+    CLAUDE_4_5_OPUS: ClaudeModelCapabilities(),
+    CLAUDE_4_6_SONNET: ClaudeModelCapabilities(),
+    CLAUDE_4_6_OPUS: ClaudeModelCapabilities(),
+    CLAUDE_4_7_OPUS: _NO_SAMPLING_PARAMS,
+    CLAUDE_4_8_OPUS: _NO_SAMPLING_PARAMS,
+    CLAUDE_5_OPUS: _NO_SAMPLING_PARAMS,
+    CLAUDE_5_5_OPUS: ClaudeModelCapabilities(sampling_params=False, forced_tool_choice=False),
+    CLAUDE_5_SONNET: _NO_SAMPLING_PARAMS,
+    CLAUDE_5_5_SONNET: ClaudeModelCapabilities(sampling_params=False, forced_tool_choice=False),
+    CLAUDE_5_5_HAIKU: _NO_SAMPLING_PARAMS,
 }
 
-# These models reject temperature, top_p, and top_k.
-_MODELS_NOT_SUPPORTING_SAMPLING_PARAMS = {
-    CLAUDE_4_7_OPUS,
-    CLAUDE_4_8_OPUS,
-    CLAUDE_5_OPUS,
-    CLAUDE_5_5_OPUS,
-    CLAUDE_5_SONNET,
-    CLAUDE_5_5_SONNET,
-    CLAUDE_5_5_HAIKU,
-}
 
-# These models reject a tool_choice of "any" or "tool".
-_MODELS_NOT_SUPPORTING_FORCED_TOOL_CHOICE = {
-    CLAUDE_5_5_OPUS,
-    CLAUDE_5_5_SONNET,
-}
+def _to_us_model_id(model_id: str) -> str:
+    """Normalizes a Claude model ID to the "us." inference profile ID used as a key above.
 
-
-def _to_us_model_id(model: str) -> str:
-    """Converts a cross-region inference profile ID (e.g. "global.anthropic...") to the "us." one.
-
-    This allows the model capability sets above to match any inference profile for a model.
+    Handles cross-region inference profile IDs ("global.anthropic.x"), foundation model IDs
+    without a region prefix ("anthropic.x"), and ARNs of either. Other IDs (e.g. application
+    inference profile ARNs) are returned unchanged.
     """
-    prefix, sep, rest = model.partition(".anthropic.")
-    if sep and "." not in prefix and ":" not in prefix:
+    # ARNs end in "foundation-model/<id>" or "inference-profile/<id>"
+    model_id = model_id.rsplit("/", 1)[-1]
+    prefix, sep, rest = model_id.partition("anthropic.")
+    if sep and (prefix == "" or (prefix.endswith(".") and "." not in prefix[:-1])):
         return f"us.anthropic.{rest}"
-    return model
+    return model_id
 
 
-def _supports_caching(model: str) -> bool:
-    """Returns true if the model supports caching."""
-    return model not in _MODELS_NOT_SUPPORTING_CACHING
+def get_claude_model_capabilities(model_id: str) -> ClaudeModelCapabilities | None:
+    """Returns the capabilities of a known Claude model, or None if the model isn't known."""
+    return _MODEL_CAPABILITIES.get(_to_us_model_id(model_id))
 
 
-def _supports_sampling_params(model: str) -> bool:
-    """Returns true if the model accepts temperature, top_p, and top_k."""
-    return _to_us_model_id(model) not in _MODELS_NOT_SUPPORTING_SAMPLING_PARAMS
-
-
-def _supports_forced_tool_choice(model: str) -> bool:
-    """Returns true if the model accepts a tool_choice that forces tool use."""
-    return _to_us_model_id(model) not in _MODELS_NOT_SUPPORTING_FORCED_TOOL_CHOICE
+def _capabilities(model_id: str) -> ClaudeModelCapabilities:
+    """Returns the model's capabilities, assuming everything is supported for unknown models."""
+    capabilities = get_claude_model_capabilities(model_id)
+    if capabilities is None:
+        log.debug("Unknown Claude model %s. Assuming it supports all features.", model_id)
+        return ClaudeModelCapabilities()
+    return capabilities
 
 
 # https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html#model-ids-arns
@@ -191,8 +212,35 @@ class ClaudeToolResultContent(ClaudeCacheableContent):
     is_error: bool | None = None
 
 
+class ClaudeThinkingContent(BaseModel, frozen=True):
+    """A thinking block returned by models with thinking enabled.
+
+    These must be sent back unchanged when continuing a turn, e.g. with a tool result.
+    """
+
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
+
+    type: Literal["thinking"]
+    thinking: str
+    signature: str | None = None
+
+
+class ClaudeRedactedThinkingContent(BaseModel, frozen=True):
+    """A thinking block whose contents are encrypted."""
+
+    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
+
+    type: Literal["redacted_thinking"]
+    data: str
+
+
 ClaudeMessageContentType = (
-    ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent | ClaudeToolResultContent
+    ClaudeTextContent
+    | ClaudeImageContent
+    | ClaudeToolUseContent
+    | ClaudeToolResultContent
+    | ClaudeThinkingContent
+    | ClaudeRedactedThinkingContent
 )
 
 
@@ -262,7 +310,9 @@ class ClaudeInvokeLLMRequest(BaseModel, frozen=True):
     )
 
     temperature: float | None = Field(
-        default=0,
+        # Not sent by default because some models reject it. BedrockClaudeLLM.create_request sets
+        # this for models that accept it.
+        default=None,
         description="Temperature control for randomness. Closer to zero = more deterministic.",
     )
 
@@ -314,25 +364,6 @@ class ClaudeUsageInfo(BaseModel, frozen=True):
     cache_creation: ClaudeCacheCreationInfo | None = None
 
 
-class ClaudeThinkingContent(BaseModel, frozen=True):
-    """A thinking block returned by models with thinking enabled."""
-
-    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
-
-    type: Literal["thinking"]
-    thinking: str
-    signature: str | None = None
-
-
-class ClaudeRedactedThinkingContent(BaseModel, frozen=True):
-    """A thinking block whose contents are encrypted."""
-
-    model_config = ConfigDict(strict=True, extra="allow", frozen=True)
-
-    type: Literal["redacted_thinking"]
-    data: str
-
-
 class ClaudeStopDetails(BaseModel, frozen=True):
     """Structured information about a refusal."""
 
@@ -371,7 +402,12 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
     """Converts the generic LLM Message into a ClaudeMessage."""
 
     def _handle_content(
-        content: TextContent | Base64ImageContent | LLMToolUseContent | LLMToolResultContent,
+        content: TextContent
+        | Base64ImageContent
+        | LLMToolUseContent
+        | LLMToolResultContent
+        | ThinkingContent
+        | RedactedThinkingContent,
         *,
         cache: bool = False,
     ) -> ClaudeMessageContentType:
@@ -396,6 +432,13 @@ def _llm_message_to_claude_message(msg: LLMMessage) -> "ClaudeMessage":
                 )
             case LLMToolResultContent():
                 return _llm_tool_result_to_claude_tool_result(content, cache_control=cache_control)
+            case ThinkingContent():
+                # Thinking blocks can't be cached directly.
+                return ClaudeThinkingContent(
+                    type="thinking", thinking=content.thinking, signature=content.signature
+                )
+            case RedactedThinkingContent():
+                return ClaudeRedactedThinkingContent(type="redacted_thinking", data=content.data)
 
     if isinstance(msg.content, str):
         content = [ClaudeTextContent(type="text", text=msg.content, cache_control=None)]
@@ -442,7 +485,7 @@ def _llm_tool_to_claude_tool(tool: LLMTool) -> ClaudeTool:
 
 
 def _llm_tool_choice_to_claude_tool_choice(
-    tool_choice: LLMToolChoice | None,
+    tool_choice: LLMToolChoice | None, tool_names: Sequence[str]
 ) -> ClaudeToolChoice:
     if tool_choice is None:
         return ClaudeToolChoice(type="auto")
@@ -452,23 +495,12 @@ def _llm_tool_choice_to_claude_tool_choice(
         case "force_tool_use":
             return ClaudeToolChoice(type="any")
         case "force_specific_tool_use":
+            if tool_choice.tool_name not in tool_names:
+                raise ValueError(
+                    f"tool_choice requires the tool {tool_choice.tool_name!r}, which is not one of "
+                    f"the configured tools: {list(tool_names)}"
+                )
             return ClaudeToolChoice(type="tool", name=tool_choice.tool_name)
-
-
-def _unforced_tool_choice(tool_choice: ClaudeToolChoice) -> tuple[ClaudeToolChoice, str | None]:
-    """Replaces a forced tool choice with "auto" for models that reject forced tool use.
-
-    Returns the new tool choice and an instruction for the system prompt that asks for the tool
-    call instead, or None if the tool choice wasn't forced.
-    """
-    match tool_choice.type:
-        case "auto":
-            return tool_choice, None
-        case "tool":
-            instruction = f"You must call the `{tool_choice.name}` tool in your response."
-        case "any":
-            instruction = "You must call one of the tools in your response."
-    return ClaudeToolChoice(type="auto"), instruction
 
 
 def _llm_tool_result_to_claude_tool_result(
@@ -499,19 +531,111 @@ def _llm_tool_result_to_claude_tool_result(
     return out
 
 
-def _disallow_additional_properties(schema: Any) -> Any:  # noqa: ANN401
+# JSON schema keywords whose values are subschemas. Other keywords (e.g. default, examples, const,
+# and enum) hold data and must not be modified.
+_SUBSCHEMA_KEYWORDS = {
+    "items",
+    "additionalItems",
+    "unevaluatedItems",
+    "contains",
+    "not",
+    "if",
+    "then",
+    "else",
+    "propertyNames",
+}
+_SUBSCHEMA_LIST_KEYWORDS = {"anyOf", "oneOf", "allOf", "prefixItems"}
+_SUBSCHEMA_MAP_KEYWORDS = {
+    "properties",
+    "patternProperties",
+    "dependentSchemas",
+    "$defs",
+    "definitions",
+}
+
+
+def _disallow_additional_properties(schema: dict[str, Any]) -> dict[str, Any]:
     """Sets additionalProperties to false on every object in a JSON schema.
 
-    Claude structured output requires this on every object type.
+    Claude structured output requires this on every object type, so objects that allow additional
+    properties (e.g. dict fields) aren't supported and raise a ValueError.
     """
-    if isinstance(schema, list):
-        return [_disallow_additional_properties(v) for v in cast("list[Any]", schema)]
-    if not isinstance(schema, dict):
-        return schema
-    out = {k: _disallow_additional_properties(v) for k, v in cast("dict[str, Any]", schema).items()}
-    if out.get("type") == "object" and "additionalProperties" not in out:
+
+    def _subschema(value: Any) -> Any:  # noqa: ANN401
+        if isinstance(value, dict):
+            return _disallow_additional_properties(cast("dict[str, Any]", value))
+        return value
+
+    out = dict(schema)
+    for key, value in schema.items():
+        if key in _SUBSCHEMA_KEYWORDS:
+            # "items" may also be a list of schemas in older drafts.
+            out[key] = (
+                [_subschema(v) for v in cast("list[Any]", value)]
+                if isinstance(value, list)
+                else _subschema(value)
+            )
+        elif key in _SUBSCHEMA_LIST_KEYWORDS and isinstance(value, list):
+            out[key] = [_subschema(v) for v in cast("list[Any]", value)]
+        elif key in _SUBSCHEMA_MAP_KEYWORDS and isinstance(value, dict):
+            out[key] = {k: _subschema(v) for k, v in cast("dict[str, Any]", value).items()}
+
+    schema_type = schema.get("type")
+    is_object = schema_type == "object" or (
+        isinstance(schema_type, list) and "object" in cast("list[Any]", schema_type)
+    )
+    if is_object:
+        if schema.get("additionalProperties", False) is not False:
+            raise ValueError(
+                "Claude structured output requires additionalProperties to be false on every "
+                "object, so objects with arbitrary keys (e.g. dict fields) aren't supported. "
+                f"Schema: {json.dumps(schema)}"
+            )
         out["additionalProperties"] = False
     return out
+
+
+def validate_claude_sampling_params(model_id: str, config: LLMInferenceConfig) -> bool:
+    """Returns true if temperature, top_p, and top_k should be sent to the model.
+
+    Models that reject sampling params get none of them. The default temperature of 0 is dropped
+    for these models so provider-neutral configs keep working, but any other temperature, top_p,
+    or top_k raises a ValueError rather than being silently ignored.
+    """
+    capabilities = get_claude_model_capabilities(model_id)
+    if capabilities is None or capabilities.sampling_params:
+        return True
+    if config.temperature != 0 or config.top_p is not None or config.top_k is not None:
+        raise ValueError(
+            f"{model_id} doesn't support temperature, top_p, or top_k. Leave them at their "
+            "defaults (temperature=0, top_p=None, top_k=None)."
+        )
+    return False
+
+
+# How many times to ask again when a model that doesn't support forced tool choice responds
+# without calling a tool.
+_FORCED_TOOL_CHOICE_RETRIES = 2
+
+
+def _forced_tool_choice_instruction(model_id: str, config: LLMInferenceConfig) -> str | None:
+    """Returns an instruction to call a tool, if the model can't be forced to call one.
+
+    Returns None if the config doesn't force tool use or the model supports forced tool choice.
+    """
+    if (
+        config.tools is None
+        or config.tool_choice is None
+        or _capabilities(model_id).forced_tool_choice
+    ):
+        return None
+    match config.tool_choice.mode:
+        case "optional":
+            return None
+        case "force_tool_use":
+            return "You must call one of the tools in your response."
+        case "force_specific_tool_use":
+            return f"You must call the `{config.tool_choice.tool_name}` tool in your response."
 
 
 class ClaudeRefusalError(Exception):
@@ -557,25 +681,22 @@ class BedrockClaudeLLM(LLM):
         if config.response_prefix is not None:
             raise ValueError("Response prefix is not supported for Bedrock Claude.")
 
-        supports_sampling_params = _supports_sampling_params(self.model_id)
-        if not supports_sampling_params and (
-            "temperature" in config.model_fields_set
-            or config.top_p is not None
-            or config.top_k is not None
-        ):
-            raise ValueError(f"temperature, top_p, and top_k are not supported by {self.model_id}.")
+        capabilities = _capabilities(self.model_id)
+        send_sampling_params = validate_claude_sampling_params(self.model_id, config)
 
         tools = None
         tool_choice = None
-        # An instruction appended to the system prompt in place of a forced tool choice
-        tool_choice_instruction = None
         if config.tools is not None:
             tools = [_llm_tool_to_claude_tool(t) for t in config.tools]
-            tool_choice = _llm_tool_choice_to_claude_tool_choice(config.tool_choice)
-            if not _supports_forced_tool_choice(self.model_id):
-                tool_choice, tool_choice_instruction = _unforced_tool_choice(tool_choice)
+            tool_choice = _llm_tool_choice_to_claude_tool_choice(
+                config.tool_choice, [t.name for t in tools]
+            )
+            if not capabilities.forced_tool_choice:
+                # The model rejects forced tool choice. An instruction is added to the system
+                # prompt instead and prompt() asks again if the model doesn't call a tool.
+                tool_choice = ClaudeToolChoice(type="auto")
 
-            if _supports_caching(self.model_id) and config.cache_tools:
+            if capabilities.caching and config.cache_tools:
                 # If the model supports caching we'll cache all of the tool definitions by default.
                 # Every tool before the last tool will be included in this cache.
                 last_tool = tools[-1]
@@ -584,14 +705,12 @@ class BedrockClaudeLLM(LLM):
         system_content: list[ClaudeMessageContentType] | None = None
 
         if config.system_prompt:
-            cache_control = (
-                ClaudeCacheControl()
-                if _supports_caching(self.model_id) and config.cache_system_prompt
-                else None
-            )
+            cache_system_prompt = capabilities.caching and config.cache_system_prompt
+            cache_control = ClaudeCacheControl() if cache_system_prompt else None
             system_content = [
                 ClaudeTextContent(cache_control=cache_control, text=config.system_prompt)
             ]
+        tool_choice_instruction = _forced_tool_choice_instruction(self.model_id, config)
         if tool_choice_instruction is not None:
             # Added after the cached system prompt so it doesn't change the cached prefix.
             system_content = [
@@ -612,9 +731,9 @@ class BedrockClaudeLLM(LLM):
         return ClaudeInvokeLLMRequest(
             max_tokens=config.max_tokens,
             system=system_content,
-            temperature=config.temperature if supports_sampling_params else None,
-            top_k=config.top_k,
-            top_p=config.top_p,
+            temperature=config.temperature if send_sampling_params else None,
+            top_k=config.top_k if send_sampling_params else None,
+            top_p=config.top_p if send_sampling_params else None,
             tools=tools,
             tool_choice=tool_choice,
             messages=[_llm_message_to_claude_message(msg) for msg in messages],
@@ -634,7 +753,68 @@ class BedrockClaudeLLM(LLM):
         request = self.create_request(messages, inference_cfg)
         response = self.invoke_model_with_request(request)
         llm_msg = self._response_to_llm_message(response)
+
+        instruction = _forced_tool_choice_instruction(self.model_id, inference_cfg)
+        if instruction is not None:
+            llm_msg = self._retry_until_tool_use(messages, inference_cfg, llm_msg, instruction)
         return llm_msg
+
+    def _retry_until_tool_use(
+        self,
+        messages: Sequence[LLMMessage],
+        inference_cfg: LLMInferenceConfig,
+        llm_msg: LLMAssistantMessage,
+        instruction: str,
+    ) -> LLMAssistantMessage:
+        """Asks the model again to call a tool when tool use was requested but couldn't be forced.
+
+        Returns the last response, with token counts summed over all attempts. It may still lack
+        a tool call if the model never made one.
+        """
+
+        def _needs_retry(msg: LLMAssistantMessage) -> bool:
+            if msg.metadata is not None and msg.metadata.stop_reason == "max_tokens":
+                # Asking again won't help if the model ran out of tokens.
+                return False
+            return not any(isinstance(c, LLMToolUseContent) for c in msg.content)
+
+        input_tokens = llm_msg.metadata.input_tokens if llm_msg.metadata else 0
+        output_tokens = llm_msg.metadata.output_tokens if llm_msg.metadata else 0
+        retry_messages = list(messages)
+        for _ in range(_FORCED_TOOL_CHOICE_RETRIES):
+            if not _needs_retry(llm_msg):
+                break
+            log.warning(
+                "%s responded without calling a tool even though tool use was required. "
+                "Asking it again.",
+                self.model_id,
+            )
+            if llm_msg.content:
+                retry_messages.append(llm_msg)
+            retry_messages.append(LLMUserMessage(content=instruction))
+            response = self.invoke_model_with_request(
+                self.create_request(retry_messages, inference_cfg)
+            )
+            llm_msg = self._response_to_llm_message(response)
+            input_tokens += response.usage.input_tokens
+            output_tokens += response.usage.output_tokens
+        else:
+            if _needs_retry(llm_msg):
+                log.warning(
+                    "%s didn't call a tool after %d retries.",
+                    self.model_id,
+                    _FORCED_TOOL_CHOICE_RETRIES,
+                )
+
+        if llm_msg.metadata is None:
+            return llm_msg
+        return llm_msg.model_copy(
+            update={
+                "metadata": llm_msg.metadata.model_copy(
+                    update={"input_tokens": input_tokens, "output_tokens": output_tokens}
+                )
+            }
+        )
 
     @timed_function
     def invoke_model_with_request(self, request: ClaudeInvokeLLMRequest) -> ClaudeResponse:
@@ -673,23 +853,24 @@ class BedrockClaudeLLM(LLM):
 
     def _response_to_llm_message(self, response: ClaudeResponse) -> LLMAssistantMessage:
         def _to_llm_content(
-            c: ClaudeTextContent | ClaudeImageContent | ClaudeToolUseContent,
-        ) -> TextContent | Base64ImageContent | LLMToolUseContent:
+            c: ClaudeTextContent
+            | ClaudeToolUseContent
+            | ClaudeThinkingContent
+            | ClaudeRedactedThinkingContent,
+        ) -> TextContent | LLMToolUseContent | ThinkingContent | RedactedThinkingContent:
             match c:
                 case ClaudeTextContent(text=text):
                     return TextContent(text=text)
-                case ClaudeImageContent():
-                    return Base64ImageContent(media_type=c.source.media_type, data=c.source.data)
                 case ClaudeToolUseContent():
                     return LLMToolUseContent(id=c.id, name=c.name, input=c.input)
+                # Thinking blocks are kept because they must be sent back with tool results.
+                case ClaudeThinkingContent():
+                    return ThinkingContent(thinking=c.thinking, signature=c.signature)
+                case ClaudeRedactedThinkingContent():
+                    return RedactedThinkingContent(data=c.data)
 
         return LLMAssistantMessage(
-            # Thinking blocks are dropped. Claude doesn't require them to be sent back.
-            content=[
-                _to_llm_content(c)
-                for c in response.content
-                if not isinstance(c, ClaudeThinkingContent | ClaudeRedactedThinkingContent)
-            ],
+            content=[_to_llm_content(c) for c in response.content],
             metadata=LLMResponseMetadata(
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,

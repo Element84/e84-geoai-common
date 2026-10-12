@@ -1,31 +1,44 @@
 import base64
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
 from rich import print as rich_print
 
+from e84_geoai_common.llm import models
 from e84_geoai_common.llm.core.llm import (
     Base64ImageContent,
     CachePointContent,
     ExecutableLLMTool,
     JSONContent,
+    LLMAssistantMessage,
     LLMInferenceConfig,
     LLMTool,
     LLMToolChoice,
     LLMToolResultContent,
     LLMToolUseContent,
     LLMUserMessage,
+    RedactedThinkingContent,
     TextContent,
+    ThinkingContent,
 )
+from e84_geoai_common.llm.models import claude
 from e84_geoai_common.llm.models.claude import (
+    CLAUDE_3_5_SONNET_V2,
     CLAUDE_4_5_HAIKU,
+    CLAUDE_4_7_OPUS,
     CLAUDE_5_5_HAIKU,
     CLAUDE_5_5_OPUS,
     BedrockClaudeLLM,
+    ClaudeInvokeLLMRequest,
+    ClaudeRedactedThinkingContent,
     ClaudeTextContent,
+    ClaudeThinkingContent,
     ClaudeToolChoice,
+    get_claude_model_capabilities,
 )
+from e84_geoai_common.llm.models.converse import BedrockConverseLLM
 from e84_geoai_common.llm.tests.mock_bedrock_runtime import (
     _MockBedrockRuntimeClient,  # type: ignore[reportPrivateUsage]
     claude_response_with_content,
@@ -303,10 +316,12 @@ def test_large_system_prompt() -> None:
     assert response.usage.cache_creation_input_tokens > 0
 
 
-def test_thinking_blocks_are_dropped() -> None:
+def test_thinking_blocks_are_kept_and_sent_back() -> None:
+    # Always uses canned responses. Real models only return thinking blocks when thinking is
+    # enabled, which this library doesn't do.
     llm = BedrockClaudeLLM(
         model_id=CLAUDE_5_5_HAIKU,
-        client=make_test_bedrock_runtime_client(
+        client=_MockBedrockRuntimeClient(
             [
                 claude_response_with_content(
                     [
@@ -322,11 +337,56 @@ def test_thinking_blocks_are_dropped() -> None:
         [LLMUserMessage(content="Output the word hello backwards and only that.")],
         LLMInferenceConfig(max_tokens=4000),
     )
-    assert resp.model_dump(exclude={"metadata": {"input_tokens", "output_tokens"}}) == {
-        "role": "assistant",
-        "content": [{"text": "olleh"}],
-        "metadata": {"stop_reason": "end_turn"},
+    assert resp.content == [
+        ThinkingContent(thinking="", signature="abc123"),
+        RedactedThinkingContent(data="encrypted"),
+        TextContent(text="olleh"),
+    ]
+    assert resp.to_text_only() == "olleh"
+
+    # The thinking blocks are sent back when the assistant message is part of the conversation.
+    request = llm.create_request(
+        [LLMUserMessage(content="hello"), resp, LLMUserMessage(content="again")],
+        LLMInferenceConfig(),
+    )
+    assert request.messages[1].content[:2] == [
+        ClaudeThinkingContent(type="thinking", thinking="", signature="abc123"),
+        ClaudeRedactedThinkingContent(type="redacted_thinking", data="encrypted"),
+    ]
+
+
+def test_model_ids_are_normalized() -> None:
+    expected = get_claude_model_capabilities(CLAUDE_4_7_OPUS)
+    assert expected is not None
+    for model_id in [
+        "global.anthropic.claude-opus-4-7",
+        "eu.anthropic.claude-opus-4-7",
+        "anthropic.claude-opus-4-7",
+        "arn:aws:bedrock:us-east-1:123456789012:inference-profile/global.anthropic.claude-opus-4-7",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-opus-4-7",
+    ]:
+        assert get_claude_model_capabilities(model_id) == expected, model_id
+    assert get_claude_model_capabilities("meta.llama3-70b-instruct-v1:0") is None
+
+
+def test_every_model_constant_has_capabilities() -> None:
+    constants = {
+        name: value
+        for name, value in vars(claude).items()
+        if name.startswith("CLAUDE_") and isinstance(value, str)
     }
+    assert [name for name, v in constants.items() if not get_claude_model_capabilities(v)] == []
+    # They're also exported from the models package.
+    assert [name for name in constants if not hasattr(models, name)] == []
+
+
+def test_caching_uses_normalized_model_id() -> None:
+    model_id = CLAUDE_3_5_SONNET_V2.replace("us.", "global.", 1)
+    llm = BedrockClaudeLLM(model_id=model_id, client=make_test_bedrock_runtime_client([]))
+    request = llm.create_request(
+        [LLMUserMessage(content="hello")], LLMInferenceConfig(system_prompt="Be helpful.")
+    )
+    assert request.system == [ClaudeTextContent(text="Be helpful.")]
 
 
 def test_sampling_params_omitted_for_newer_models() -> None:
@@ -339,10 +399,23 @@ def test_sampling_params_omitted_for_newer_models() -> None:
     for model_id in [CLAUDE_5_5_OPUS, "global.anthropic.claude-opus-5-5"]:
         llm = BedrockClaudeLLM(model_id=model_id, client=make_test_bedrock_runtime_client([]))
         assert llm.create_request(messages, LLMInferenceConfig()).temperature is None
-        with pytest.raises(ValueError, match="not supported"):
+        # An explicit default temperature is dropped too.
+        assert llm.create_request(messages, LLMInferenceConfig(temperature=0)).temperature is None
+        with pytest.raises(ValueError, match="doesn't support"):
             llm.create_request(messages, LLMInferenceConfig(temperature=0.5))
-        with pytest.raises(ValueError, match="not supported"):
+        with pytest.raises(ValueError, match="doesn't support"):
             llm.create_request(messages, LLMInferenceConfig(top_p=0.5))
+
+
+def test_converse_omits_sampling_params_for_newer_claude_models() -> None:
+    llm = BedrockConverseLLM(model_id=CLAUDE_5_5_OPUS, client=make_test_bedrock_runtime_client([]))
+    request = llm.create_request([LLMUserMessage(content="hello")], LLMInferenceConfig())
+    assert request.inferenceConfig is not None
+    assert request.inferenceConfig.temperature is None
+
+
+def test_request_temperature_defaults_to_none() -> None:
+    assert ClaudeInvokeLLMRequest().temperature is None
 
 
 class Country(BaseModel):
@@ -352,32 +425,92 @@ class Country(BaseModel):
 class City(BaseModel):
     name: str
     country: Country
+    previous_country: Country | None = None
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class CityWithDefault(BaseModel):
+    name: str
+    tags: list[str] = Field(default=["type", "object"], examples=[{"type": "object"}])
+
+
+def _structured_output_schema(model: type[BaseModel]) -> dict[str, Any]:
+    llm = BedrockClaudeLLM(client=make_test_bedrock_runtime_client([]))
+    request = llm.create_request(
+        [LLMUserMessage(content="hello")], LLMInferenceConfig(structured_output_model=model)
+    )
+    assert request.output_config is not None
+    return request.output_config.format.schema_
 
 
 def test_structured_output_schema_disallows_additional_properties() -> None:
-    llm = BedrockClaudeLLM(client=make_test_bedrock_runtime_client([]))
-    request = llm.create_request(
-        [LLMUserMessage(content="hello")], LLMInferenceConfig(structured_output_model=City)
-    )
-    assert request.output_config is not None
-    schema = request.output_config.format.schema_
+    schema = _structured_output_schema(Country)
     assert schema["additionalProperties"] is False
-    assert schema["$defs"]["Country"]["additionalProperties"] is False
+
+    # Data keywords like default and examples are left alone.
+    schema = _structured_output_schema(CityWithDefault)
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["tags"]["default"] == ["type", "object"]
+    assert schema["properties"]["tags"]["examples"] == [{"type": "object"}]
+
+    # Objects with arbitrary keys can't be represented.
+    with pytest.raises(ValueError, match="additionalProperties"):
+        _structured_output_schema(City)
 
 
-def test_forced_tool_choice_replaced_for_models_that_reject_it() -> None:
-    messages = [LLMUserMessage(content="hello")]
-    config = LLMInferenceConfig(
+def test_disallow_additional_properties_handles_nested_and_nullable_objects() -> None:
+    schema = claude._disallow_additional_properties(  # type: ignore[reportPrivateUsage]
+        {
+            "type": "object",
+            "properties": {
+                "a": {"type": ["object", "null"], "properties": {}},
+                "b": {"anyOf": [{"$ref": "#/$defs/C"}, {"type": "null"}]},
+            },
+            "$defs": {"C": {"type": "object", "default": {"type": "object"}}},
+        }
+    )
+    assert schema == {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "a": {"type": ["object", "null"], "properties": {}, "additionalProperties": False},
+            "b": {"anyOf": [{"$ref": "#/$defs/C"}, {"type": "null"}]},
+        },
+        "$defs": {
+            "C": {"type": "object", "default": {"type": "object"}, "additionalProperties": False}
+        },
+    }
+
+
+def _parse_city_config(tool_choice: LLMToolChoice) -> LLMInferenceConfig:
+    return LLMInferenceConfig(
         system_prompt="Be helpful.",
         tools=[
             LLMTool(
                 name="parse_data",
                 description="Parse the data.",
-                input_model=City,
+                input_model=Country,
                 output_model=None,
             )
         ],
-        tool_choice=LLMToolChoice(mode="force_specific_tool_use", tool_name="parse_data"),
+        tool_choice=tool_choice,
+    )
+
+
+def test_forced_tool_choice_requires_a_configured_tool() -> None:
+    llm = BedrockClaudeLLM(client=make_test_bedrock_runtime_client([]))
+    for tool_name in [None, "other_tool"]:
+        config = _parse_city_config(
+            LLMToolChoice(mode="force_specific_tool_use", tool_name=tool_name)
+        )
+        with pytest.raises(ValueError, match="not one of the configured tools"):
+            llm.create_request([LLMUserMessage(content="hello")], config)
+
+
+def test_forced_tool_choice_replaced_for_models_that_reject_it() -> None:
+    messages = [LLMUserMessage(content="hello")]
+    config = _parse_city_config(
+        LLMToolChoice(mode="force_specific_tool_use", tool_name="parse_data")
     )
 
     old_llm = BedrockClaudeLLM(
@@ -396,3 +529,32 @@ def test_forced_tool_choice_replaced_for_models_that_reject_it() -> None:
         "Be helpful.",
         "You must call the `parse_data` tool in your response.",
     ]
+
+
+def test_unforced_tool_choice_retries_until_tool_use() -> None:
+    tool_use = {"type": "tool_use", "id": "t1", "name": "parse_data", "input": {"name": "France"}}
+    client = _MockBedrockRuntimeClient(
+        [
+            claude_response_with_content("France is a country."),
+            claude_response_with_content([tool_use], overrides={"stop_reason": "tool_use"}),
+        ]
+    )
+    llm = BedrockClaudeLLM(model_id=CLAUDE_5_5_OPUS, client=client)
+    config = _parse_city_config(LLMToolChoice(mode="force_tool_use", tool_name=None))
+    resp = llm.prompt([LLMUserMessage(content="France")], config)
+
+    assert resp.content == [LLMToolUseContent(id="t1", name="parse_data", input={"name": "France"})]
+    assert client.canned_responses == []
+    # Token counts cover both attempts.
+    assert resp.metadata is not None
+    assert (resp.metadata.input_tokens, resp.metadata.output_tokens) == (246, 642)
+
+
+def test_unforced_tool_choice_gives_up_after_retries() -> None:
+    client = _MockBedrockRuntimeClient([claude_response_with_content("No.") for _ in range(3)])
+    llm = BedrockClaudeLLM(model_id=CLAUDE_5_5_OPUS, client=client)
+    config = _parse_city_config(LLMToolChoice(mode="force_tool_use", tool_name=None))
+    resp = llm.prompt([LLMUserMessage(content="France")], config)
+    assert isinstance(resp, LLMAssistantMessage)
+    assert resp.to_text_only() == "No."
+    assert client.canned_responses == []

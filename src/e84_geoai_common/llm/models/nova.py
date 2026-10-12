@@ -23,7 +23,9 @@ from e84_geoai_common.llm.core.llm import (
     LLMResponseMetadata,
     LLMToolResultContent,
     LLMToolUseContent,
+    RedactedThinkingContent,
     TextContent,
+    ThinkingContent,
 )
 from e84_geoai_common.tracing import observe, timed_function
 
@@ -188,6 +190,9 @@ def _llm_message_to_nova_message(msg: LLMMessage) -> NovaMessage:
                 raise NotImplementedError
             case LLMToolResultContent():
                 raise NotImplementedError
+            case ThinkingContent() | RedactedThinkingContent():
+                # Thinking content comes from other providers and isn't sent to Nova.
+                return acc
             case CachePointContent():
                 # If cache point is first element, drop it.
                 if len(acc) == 0:
